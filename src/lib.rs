@@ -4,7 +4,7 @@
 //! multimap; `foropts` treats the arguments as a sequence. This usually isn’t what you want, but
 //! occasionally it is.
 //!
-//! # Examples
+//! # Example
 //!
 //! In this example, we accept one boolean flag, `-v` (or `--verbose`), and two
 //! string options, `-b` (or `--before`) and `-a` (or `--after`). The string options
@@ -46,6 +46,7 @@
 //! assert_eq!( "4123", accumulator );
 //! assert!( verbose );
 //! ```
+
 use std::str::FromStr;
 
 mod util;
