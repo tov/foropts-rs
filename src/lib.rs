@@ -1,4 +1,5 @@
 use std::fmt;
+use std::result;
 
 #[derive(Debug)]
 pub struct Builder<'a, T> {
@@ -10,21 +11,16 @@ pub struct Builder<'a, T> {
 }
 
 /// A description of an argument, which may be a flag or have a parameter.
-#[derive(Debug)]
 pub struct Arg<'a, T> {
-    parameter:  Option<Parameter<'a, T>>,
+    name:       String,
+    action:     Box<Fn(&str) -> Result<T> + 'a>,
     short:      String,
     long:       String,
     equals:     String,
 }
 
-struct Parameter<'a, T> {
-    name:       String,
-    parser:     Box<Fn(&str) -> Result<T> + 'a>,
-}
-
 /// The result type for argument parsers.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Error {
@@ -68,9 +64,9 @@ impl<'a, T> Builder<'a, T> {
     }
 
     fn add_arg(&mut self, arg: Arg<'a, T>) {
-        if arg.short.is_empty() && arg.long.is_empty() && arg.parameter.is_none() {
-            panic!("foropts::Builder::arg: nameless flag")
-        }
+//        if arg.short.is_empty() && arg.long.is_empty() {
+//            panic!("foropts::Builder::arg: nameless flag")
+//        }
 
         for each in &self.args {
             assert_ne!( each.short, arg.short,
@@ -98,25 +94,23 @@ impl<'a, T> Builder<'a, T> {
 }
 
 impl<'a, T> Arg<'a, T> {
-    pub fn flag() -> Self {
-        Arg {
-            parameter: None,
-            short:     String::new(),
-            long:      String::new(),
-            equals:    String::new(),
-        }
+    pub fn flag<F>(thunk: F) -> Self
+        where F: Fn() -> T + 'a
+    {
+        Self::param("", move |_| Ok(thunk()))
     }
 
     pub fn param<S, F>(name: S, parser: F) -> Self
         where S: Into<String>,
               F: Fn(&str) -> Result<T> + 'a
     {
-        let mut result = Self::flag();
-        result.parameter = Some(Parameter {
-            name: name.into(),
-            parser: Box::new(parser),
-        });
-        result
+        Arg {
+            name:       name.into(),
+            action:     Box::new(parser),
+            short:      String::new(),
+            long:       String::new(),
+            equals:     String::new(),
+        }
     }
 
     /// Sets the short name of the option.
@@ -135,12 +129,45 @@ impl<'a, T> Arg<'a, T> {
     }
 }
 
-impl<'a, T> fmt::Debug for Parameter<'a, T> {
+impl Error {
+    pub fn from_string<S: ToString>(e: S) -> Self {
+        Error {
+            message: e.to_string(),
+        }
+    }
+}
+
+impl<'a, T> fmt::Debug for Arg<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Parameter")
-            .field("name", &self.name)
-            .field("parser", &"…")
+        f.debug_struct("Arg")
+            .field("name",      &self.name)
+            .field("action",    &"…")
+            .field("short",     &self.short)
+            .field("long",      &self.long)
+            .field("equals",    &self.equals)
             .finish()
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{Builder, Arg, Error};
+
+    enum MooOpt {
+        Louder,
+        Softer,
+        Freq(f32),
+    }
+
+    #[test]
+    fn moo() {
+        let _builder = Builder::new("moo")
+            .arg(Arg::flag(|| MooOpt::Louder).short('l').long("louder"))
+            .arg(Arg::flag(|| MooOpt::Softer).short('s').long("softer"))
+            .arg(Arg::param("FREQ", |s|
+                s.parse()
+                    .map(MooOpt::Freq)
+                    .map_err(Error::from_string))
+                .short('f').long("freq"));
+    }
+}
