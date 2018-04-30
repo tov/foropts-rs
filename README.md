@@ -15,7 +15,7 @@ isn’t what you want, but occasionally it is.
 It's on [crates.io](https://crates.io/crates/foropts), so you can add
 
 ```toml
-foropts = "0.1"
+foropts = "0.3"
 ```
 
 to your `Cargo.toml` and
