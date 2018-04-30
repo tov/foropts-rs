@@ -49,7 +49,7 @@ impl<'a, T> Arg<'a, T> {
     }
 
     /// Sets the long name of the option.
-    pub fn long<'b, S: Into<String>>(mut self, s: S) -> Self {
+    pub fn long<S: Into<String>>(mut self, s: S) -> Self {
         self.long = s.into();
         self
     }
@@ -84,7 +84,7 @@ impl<'a, T> Arg<'a, T> {
     {
         if let Some(c) = arg.chars().next() {
             if c == '-' {
-                if &arg[1..] == self.long {
+                if arg[1..] == self.long {
                     *arg = "";
                     if self.name.is_empty() {
                         Some((self.action)(""))
@@ -95,7 +95,7 @@ impl<'a, T> Arg<'a, T> {
                         Some(Err(Error::from_string(msg)))
                     }
                 } else if let Some(index) = arg.find('=') {
-                    if &arg[1..index] == self.long {
+                    if arg[1..index] == self.long {
                         let param = &arg[index + 1..];
                         *arg = "";
                         Some((self.action)(param))

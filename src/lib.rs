@@ -12,7 +12,7 @@ pub use config::Config;
 pub use error::{Error, Result};
 pub use iter::Iter;
 
-pub fn parse_map<'a, A, B, F>(slice: &'a str, success: F) -> Result<B>
+pub fn parse_map<A, B, F>(slice: &str, success: F) -> Result<B>
     where A: FromStr,
           A::Err: ToString,
           F: FnOnce(A) -> B
