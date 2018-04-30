@@ -1,3 +1,16 @@
+//! An argument-parsing iterator.
+//!
+//! Most argument parsing libraries, such as [`clap`](https://clap.rs/) treat the arguments as a
+//! multimap; `foropts` treats the arguments as a sequence. This usually isn’t what you want, but
+//! occasionally it is.
+//!
+//! # Examples
+//!
+//! In this example, we accept
+//!
+//! ```
+//! # use foropts::*;
+//! ```
 use std::str::FromStr;
 
 mod util;
