@@ -17,7 +17,7 @@ pub fn parse_map<A, B, F>(slice: &str, success: F) -> Result<B>
           A::Err: ToString,
           F: FnOnce(A) -> B
 {
-    slice.parse().map(success).map_err(Error::from_string)
+    slice.parse().map(success).map_err(|s| Error::from_string(&s))
 }
 
 #[cfg(test)]

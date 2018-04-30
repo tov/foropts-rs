@@ -9,7 +9,7 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn from_string<S: ToString>(e: S) -> Self {
+    pub fn from_string<S: ToString>(e: &S) -> Self {
         Error {
             message: e.to_string(),
         }

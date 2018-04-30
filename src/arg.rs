@@ -92,7 +92,7 @@ impl<'a, T> Arg<'a, T> {
                         Some((self.action)(&next))
                     } else {
                         let msg = format!("Option --{} requires parameter", self.long);
-                        Some(Err(Error::from_string(msg)))
+                        Some(Err(Error::from_string(&msg)))
                     }
                 } else if let Some(index) = arg.find('=') {
                     if arg[1..index] == self.long {
@@ -114,7 +114,7 @@ impl<'a, T> Arg<'a, T> {
                         Some((self.action)(&next))
                     } else {
                         let msg = format!("Option -{} requires parameter", c);
-                        Some(Err(Error::from_string(msg)))
+                        Some(Err(Error::from_string(&msg)))
                     }
                 } else {
                     let param = mem::replace(arg, "");
