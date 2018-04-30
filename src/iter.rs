@@ -1,5 +1,16 @@
 use super::*;
 
+/// The iterator over the processed arguments.
+///
+/// # Params
+///
+/// `'a` – the lifetime of app’s [`Config`](struct.Config.html)
+///
+/// `'b` - the lifetime of the argument processing actions (closures) in the `Config`
+///
+/// `I`  – the underlying `String` iterator from which we are getting the unprocessed arguments
+///
+/// `T`  – the type into which each argument is parsed
 #[derive(Debug)]
 pub struct Iter<'a, 'b: 'a, I, T: 'a>
     where I: IntoIterator<Item=String>
