@@ -95,7 +95,7 @@ mod tests {
         assert_eq!( Ok("abba".to_owned()), result );
     }
 
-    #[derive(Clone, PartialEq, Debug)]
+    #[derive(PartialEq, Debug)]
     enum FLS {
         Freq(f32),
         Louder,
@@ -156,6 +156,33 @@ mod tests {
             .arg(Arg::parsed_param("FREQ", FLS::Freq).short('f').long("freq"))
             .arg(Arg::flag(|| FLS::Louder).short('l').long("louder"))
             .arg(Arg::flag(|| FLS::Softer).short('s').long("softer"))
+    }
+
+    #[derive(PartialEq, Debug)]
+    enum Pos {
+        FlagA,
+        Positional(String),
+    }
+
+    #[test]
+    fn double_hyphen_works() {
+        let config = &pos_config();
+        assert_parse_error(config, &["-b", "--", "-a"]);
+        assert_parse(config, &["-a", "--", "-b"],
+                     &[Pos::FlagA, Pos::Positional("-b".to_owned())]);
+        assert_parse(config, &["-a", "--", "-a"],
+                     &[Pos::FlagA, Pos::Positional("-a".to_owned())]);
+        assert_parse(config, &["-aa", "bbb", "-a"],
+                     &[Pos::FlagA,
+                       Pos::FlagA,
+                       Pos::Positional("bbb".to_owned()),
+                       Pos::FlagA]);
+    }
+
+    fn pos_config() -> Config<'static, Pos> {
+        Config::new("pos")
+            .arg(Arg::flag(|| Pos::FlagA).short('a'))
+            .arg(Arg::parsed_param("POS", Pos::Positional))
     }
 
     fn assert_parse_error<T>(config: &Config<T>, args: &[&str]) {

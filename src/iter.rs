@@ -30,6 +30,15 @@ impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
         self.push_back.take().or_else(|| self.args.next()).and_then(|item| {
             let mut arg = item.as_str();
 
+            if self.positional {
+                return self.config.parse_positional(arg);
+            }
+
+            if arg == "--" {
+                self.positional = true;
+                return self.args.next().and_then(|arg| self.config.parse_positional(&arg));
+            }
+
             if let Some(c) = arg.chars().next() {
                 if c == '-' {
                     arg = &arg[1..];
