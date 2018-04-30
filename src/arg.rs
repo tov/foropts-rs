@@ -1,7 +1,7 @@
 use util::*;
 use super::*;
 
-use std::fmt;
+use std::{fmt, io};
 
 /// A description of an argument, which may be a Boolean flag or carry a parameter.
 ///
@@ -15,6 +15,7 @@ pub struct Arg<'a, T> {
     action:     Box<Fn(&str) -> Result<T> + 'a>,
     short:      Option<char>,
     long:       String,
+    descr:      String,
 }
 
 impl<'a, T> fmt::Debug for Arg<'a, T> {
@@ -24,6 +25,7 @@ impl<'a, T> fmt::Debug for Arg<'a, T> {
             .field("action",    &"…")
             .field("short",     &self.short)
             .field("long",      &self.long)
+            .field("descr",     &self.descr)
             .finish()
     }
 }
@@ -57,6 +59,7 @@ impl<'a, T> Arg<'a, T> {
             action:     Box::new(parser),
             short:      None,
             long:       String::new(),
+            descr:      String::new(),
         }
     }
 
@@ -96,6 +99,47 @@ impl<'a, T> Arg<'a, T> {
     pub fn long<S: Into<String>>(mut self, s: S) -> Self {
         self.long = s.into();
         self
+    }
+
+    /// Sets the description of the option (for the help message).
+    pub fn description<S: Into<String>>(mut self, s: S) -> Self {
+        self.descr = s.into();
+        self
+    }
+
+    /// Writes the usage for this option to the writer.
+    pub (crate) fn write_option_usage<W: io::Write>(&self, mut out: W) -> io::Result<()> {
+        if self.positional_name().is_some() { return Ok(()) }
+
+        if let Some(c) = self.short {
+            if self.long.is_empty() {
+                write!(out, "-{}", c)?;
+            } else {
+                write!(out, "-{}, --{}", c, self.long)?;
+            }
+        } else {
+            write!(out, "--{}", self.long)?;
+        }
+
+        if !self.name.is_empty() {
+            write!(out, " <{}>", self.name)?;
+        }
+
+        if !self.descr.is_empty() {
+            write!(out, "   {}", self.descr)?;
+        }
+
+        writeln!(out)
+    }
+
+    pub (crate) fn positional_name(&self) -> Option<&str> {
+        if self.short.is_none() && self.long.is_empty() {
+            None
+        } else if self.name.is_empty() {
+            Some(&"ARG")
+        } else {
+            Some(&self.name)
+        }
     }
 
     /// Checks that this `Arg` and another `Arg` don't claim the same option names.

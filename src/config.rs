@@ -1,5 +1,7 @@
 use super::*;
 
+use std::io;
+
 /// The configuration for the argument parser.
 ///
 /// # Parameters
@@ -90,6 +92,47 @@ impl<'a, T> Config<'a, T> {
     /// parsed arguments.
     pub fn iter<'b, I: IntoIterator<Item=String>>(&'b self, args: I) -> Iter<'b, 'a, I, T> {
         Iter::new(self, args)
+    }
+
+    /// Writes version information to the given `Write`.
+    pub fn write_version<W: io::Write>(&self, mut out: W) -> io::Result<()> {
+        write!(out, "{}", self.name)?;
+        if let Some(ref version) = self.version {
+            write!(out, " {}", *version)?;
+        }
+        writeln!(out)
+    }
+
+    fn write_usage_line<W: io::Write>(&self, mut out: W) -> io::Result<()> {
+        write!(out, "Usage: {} OPTION...", self.name)?;
+
+        for arg in &self.args {
+            if let Some(name) = arg.positional_name() {
+                return writeln!(out, " [--] {}...", name);
+            }
+        }
+
+        writeln!(out)
+    }
+
+    /// Writes usage information to the given `Write`.
+    pub fn write_usage<W: io::Write>(&self, mut out: W) -> io::Result<()> {
+        self.write_version(&mut out)?;
+        if let Some(ref author) = self.author {
+            writeln!(out, "{}", *author)?;
+        }
+        if let Some(ref about) = self.about {
+            writeln!(out, "{}", *about)?;
+        }
+        writeln!(out)?;
+
+        self.write_usage_line(&mut out)?;
+
+        writeln!(out, "OPTIONS:")?;
+        for arg in &self.args {
+            arg.write_option_usage(&mut out)?;
+        }
+        Ok(())
     }
 
     pub (crate) fn parse_positional(&self, arg: &str) -> Result<T> {
