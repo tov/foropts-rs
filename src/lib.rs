@@ -1,5 +1,6 @@
 use std::fmt;
 use std::result;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Builder<'a, T> {
@@ -149,9 +150,17 @@ impl<'a, T> fmt::Debug for Arg<'a, T> {
     }
 }
 
+pub fn parse_map<'a, A, B, F>(slice: &'a str, success: F) -> Result<B>
+    where A: FromStr,
+          A::Err: ToString,
+          F: FnOnce(A) -> B
+{
+    slice.parse().map(success).map_err(Error::from_string)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Builder, Arg, Error};
+    use super::{Builder, Arg, parse_map};
 
     enum MooOpt {
         Louder,
@@ -164,10 +173,7 @@ mod tests {
         let _builder = Builder::new("moo")
             .arg(Arg::flag(|| MooOpt::Louder).short('l').long("louder"))
             .arg(Arg::flag(|| MooOpt::Softer).short('s').long("softer"))
-            .arg(Arg::param("FREQ", |s|
-                s.parse()
-                    .map(MooOpt::Freq)
-                    .map_err(Error::from_string))
+            .arg(Arg::param("FREQ", |s| parse_map(s, MooOpt::Freq))
                 .short('f').long("freq"));
     }
 }
