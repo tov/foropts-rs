@@ -53,8 +53,7 @@ impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
                         }
                     }
 
-                    let msg = format!("Unknown option: -{}", arg);
-                    Some(Err(Error::from_string(&msg)))
+                    Some(Err(Error::from_string("unrecognized").with_option(arg)))
                 } else {
                     self.config.parse_positional(arg)
                 }

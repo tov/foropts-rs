@@ -151,6 +151,12 @@ mod tests {
         assert_parse(config, &["--freq", "5.5"], &[FLS::Freq(5.5)]);
     }
 
+    #[test]
+    fn float_parsing_error_message() {
+        assert_parse_error_matches(&fls_config(), &["-fhello"],
+                                   "option -fhello: invalid float literal");
+    }
+
     fn fls_config() -> Config<'static, FLS> {
         Config::new("fls")
             .arg(Arg::parsed_param("FREQ", FLS::Freq).short('f').long("freq"))
@@ -179,10 +185,25 @@ mod tests {
                        Pos::FlagA]);
     }
 
+    #[test]
+    fn unrecognized_option_works() {
+        assert_parse_error_matches(&pos_config(),
+                                   &["-b"],
+                                   "option -b: unrecognized");
+    }
+
     fn pos_config() -> Config<'static, Pos> {
         Config::new("pos")
             .arg(Arg::flag(|| Pos::FlagA).short('a'))
             .arg(Arg::parsed_param("POS", Pos::Positional))
+    }
+
+    fn assert_parse_error_matches<T>(config: &Config<T>, args: &[&str], pattern: &str) {
+        match parse(config, args) {
+            Ok(_)  => panic!("expected parse failure, got success"),
+            Err(e) => assert!( e.to_string().matches(pattern).next().is_some(),
+                               format!("{:?} does not match {:?}", e.to_string(), pattern)),
+        }
     }
 
     fn assert_parse_error<T>(config: &Config<T>, args: &[&str]) {

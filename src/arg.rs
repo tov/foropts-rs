@@ -102,16 +102,16 @@ impl<'a, T> Arg<'a, T> {
     pub (crate) fn check_interference<'b, U>(&self, other: &Arg<'b, U>) -> Result<()> {
         if let (Some(c1), Some(c2)) = (self.short, other.short) {
             if c1 == c2 {
-                let msg = format!("repeat of short option: -{}", c1);
-                return Err(Error::from_string(&msg));
+                return Err(Error::from_string("repeated in config")
+                               .with_option(format!("-{}", c1)))
             }
         }
 
         let longs = (non_empty_string(&self.long), non_empty_string(&other.long));
         if let (Some(s1), Some(s2)) = longs {
             if s1 == s2 {
-                let msg = format!("repeat of long option: --{}", s1);
-                return Err(Error::from_string(&msg));
+                return Err(Error::from_string("repeated in config")
+                    .with_option(format!("--{}", s1)))
             }
         }
 
@@ -146,18 +146,20 @@ impl<'a, T> Arg<'a, T> {
     pub (crate) fn parse_optional<I>(&self, arg: &mut &str, rest: &mut I) -> Option<Result<T>>
         where I: Iterator<Item=String>
     {
+        let orig = *arg;
+
         if let Some(c) = arg.chars().next() {
             if c == '-' {
                 if arg[1..] == self.long {
                     *arg = "";
-                    if self.name.is_empty() {
-                        Some((self.action)(""))
+                    let result = if self.name.is_empty() {
+                        (self.action)("")
                     } else if let Some(next) = rest.next() {
-                        Some((self.action)(&next))
+                        (self.action)(&next)
                     } else {
-                        let msg = format!("Option --{} requires parameter", self.long);
-                        Some(Err(Error::from_string(&msg)))
-                    }
+                        Err(Error::from_string("requires parameter"))
+                    };
+                    Some(result)
                 } else if let Some(index) = arg.find('=') {
                     if arg[1..index] == self.long {
                         let param = &arg[index + 1..];
@@ -170,20 +172,20 @@ impl<'a, T> Arg<'a, T> {
                     None
                 }
             } else if Some(c) == self.short {
-                *arg = &arg[1..];
-                if self.name.is_empty() {
-                    Some((self.action)(""))
+                *arg = &arg[1..]; // What if c is not 1 byte?
+                let result = if self.name.is_empty() {
+                    (self.action)("")
                 } else if arg.is_empty() {
                     if let Some(next) = rest.next() {
-                        Some((self.action)(&next))
+                        (self.action)(&next)
                     } else {
-                        let msg = format!("Option -{} requires parameter", c);
-                        Some(Err(Error::from_string(&msg)))
+                        Err(Error::from_string("requires parameter"))
                     }
                 } else {
                     let param = mem::replace(arg, "");
-                    Some((self.action)(param))
-                }
+                    (self.action)(param)
+                };
+                Some(result)
             } else {
                 None
             }
@@ -192,7 +194,8 @@ impl<'a, T> Arg<'a, T> {
             Some((self.action)("-"))
         } else {
             None
-        }
+        }.map(|result|
+            result.map_err(|e| e.with_option(orig)))
     }
 }
 
