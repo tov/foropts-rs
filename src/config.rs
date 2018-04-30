@@ -45,30 +45,36 @@ impl<'a, T> Config<'a, T> {
         self
     }
 
-    fn add_arg(&mut self, arg: Arg<'a, T>) {
+    /// Adds an argument to the list of arguments, returning `Result::Err` if the
+    /// argument cannot be added.
+    pub fn arg_safe(&mut self, arg: Arg<'a, T>) -> Result<()> {
         for each in &self.args {
-            if let (Some(c1), Some(c2)) = (each.get_short(), arg.get_short()) {
-                assert_ne!( c1, c2, "foropts::Builder::arg: repeat of short option" );
-            }
-
-            if let (Some(s1), Some(s2)) = (each.get_long(), arg.get_long()) {
-                assert_ne!( s1, s2, "foropts::Builder::arg: repeat of long option" );
-            }
+            each.check_interference(&arg)?;
         }
 
         self.args.push(arg);
+
+        Ok(())
     }
 
     /// Adds an argument to the list of arguments.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the argument cannot be added.
     pub fn arg(mut self, arg: Arg<'a, T>) -> Self {
-        self.add_arg(arg);
+        self.arg_safe(arg).expect("foropts::Arg::arg: repeated arg");
         self
     }
 
-    /// Adds a arguments to the list of arguments.
+    /// Adds arguments to the list of arguments.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an argument cannot be added.
     pub fn args<I: IntoIterator<Item=Arg<'a, T>>>(mut self, args: I) -> Self {
         for arg in args {
-            self.add_arg(arg);
+            self.arg_safe(arg).expect("foropts::Arg::args: repeated arg");
         }
         self
     }
@@ -79,13 +85,9 @@ impl<'a, T> Config<'a, T> {
     }
 
     pub (crate) fn parse_positional(&self, arg: &str) -> Option<Result<T>> {
-        for each in &self.args {
-            if let Some(result) = each.parse_positional(arg) {
-                return Some(result)
-            }
-        }
-
-        None
+        self.args.iter()
+            .flat_map(|each| each.parse_positional(arg))
+            .next()
     }
 
     pub (crate) fn get_args(&self) -> &[Arg<'a, T>] {

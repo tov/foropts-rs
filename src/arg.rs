@@ -54,12 +54,23 @@ impl<'a, T> Arg<'a, T> {
         self
     }
 
-    pub (crate) fn get_short(&self) -> Option<char> {
-        self.short
-    }
+    pub (crate) fn check_interference<'b, U>(&self, other: &Arg<'b, U>) -> Result<()> {
+        if let (Some(c1), Some(c2)) = (self.short, other.short) {
+            if c1 == c2 {
+                let msg = format!("repeat of short option: -{}", c1);
+                return Err(Error::from_string(&msg));
+            }
+        }
 
-    pub (crate) fn get_long(&self) -> Option<&str> {
-        non_empty_string(&self.long)
+        let longs = (non_empty_string(&self.long), non_empty_string(&other.long));
+        if let (Some(s1), Some(s2)) = longs {
+            if s1 == s2 {
+                let msg = format!("repeat of long option: --{}", s1);
+                return Err(Error::from_string(&msg));
+            }
+        }
+
+        Ok(())
     }
 
     pub (crate) fn parse_positional(&self, arg: &str) -> Option<Result<T>> {
@@ -112,13 +123,11 @@ impl<'a, T> Arg<'a, T> {
             } else {
                 None
             }
+        } else if self.name.is_empty() {
+            *arg = "";
+            Some((self.action)("-"))
         } else {
-            if self.name.is_empty() {
-                *arg = "";
-                Some((self.action)("-"))
-            } else {
-                None
-            }
+            None
         }
     }
 }
