@@ -1,8 +1,9 @@
-use std::result;
+use std::{fmt, result};
 
 /// The result type for argument parsers.
 pub type Result<T> = result::Result<T, Error>;
 
+/// The error type for argument parser.
 #[derive(Debug, PartialEq)]
 pub struct Error {
     message: String,
@@ -16,3 +17,8 @@ impl Error {
     }
 }
 
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}

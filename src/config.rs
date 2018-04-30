@@ -1,5 +1,6 @@
 use super::*;
 
+/// The configuration for the argument parser.
 #[derive(Debug)]
 pub struct Config<'a, T> {
     name:       String,

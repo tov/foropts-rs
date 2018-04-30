@@ -3,7 +3,7 @@ use super::*;
 
 use std::{fmt, mem};
 
-/// A description of an argument, which may be a flag or have a parameter.
+/// A description of an argument, which may be a Boolean flag or carry a parameter.
 pub struct Arg<'a, T> {
     name:       String,
     action:     Box<Fn(&str) -> Result<T> + 'a>,
