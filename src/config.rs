@@ -105,13 +105,15 @@ impl<'a, T> Config<'a, T> {
 
     /// Prints usage information to stdout and exits with code 0.
     pub fn exit_usage(&self) -> ! {
-        self.write_usage(io::stdout()).unwrap();
+        let stdout = io::stdout();
+        self.write_usage(stdout.lock()).unwrap();
         exit(0);
     }
 
     /// Prints version information to stdout and exits with code 0.
     pub fn exit_version(&self) -> ! {
-        self.write_version(io::stdout()).unwrap();
+        let stdout = io::stdout();
+        self.write_version(stdout.lock()).unwrap();
         exit(0);
     }
 
