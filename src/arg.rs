@@ -1,7 +1,7 @@
 use util::*;
 use super::*;
 
-use std::{fmt, mem};
+use std::fmt;
 
 /// A description of an argument, which may be a Boolean flag or carry a parameter.
 ///
@@ -143,28 +143,25 @@ impl<'a, T> Arg<'a, T> {
     /// Note that `arg` should not include the leading hyphen (`'-'`), but should include the
     /// second hyphen if it’s a long argument. The pointer `arg` will be updated to contain a slice
     /// with any remaining, unprocessed portion of the argument.
-    pub (crate) fn parse_optional<I>(&self, arg: &mut &str, rest: &mut I) -> Option<Result<T>>
+    pub (crate) fn parse_optional<'b, I>(&self, arg: &'b str, args: &mut I)
+        -> Option<(Result<T>, &'b str)>
         where I: Iterator<Item=String>
     {
-        let orig = *arg;
-
-        if let Some(c) = arg.chars().next() {
+        if let Some((c, rest)) = split_first_str(arg) {
             if c == '-' {
-                if arg[1..] == self.long {
-                    *arg = "";
+                if rest == self.long {
                     let result = if self.name.is_empty() {
                         (self.action)("")
-                    } else if let Some(next) = rest.next() {
+                    } else if let Some(next) = args.next() {
                         (self.action)(&next)
                     } else {
                         Err(Error::from_string("requires parameter"))
                     };
-                    Some(result)
-                } else if let Some(index) = arg.find('=') {
-                    if arg[1..index] == self.long {
-                        let param = &arg[index + 1..];
-                        *arg = "";
-                        Some((self.action)(param))
+                    Some((result, ""))
+                } else if let Some(index) = rest.find('=') {
+                    if rest[0..index] == self.long {
+                        let param = &rest[index + 1..];
+                        Some(((self.action)(param), ""))
                     } else {
                         None
                     }
@@ -172,30 +169,26 @@ impl<'a, T> Arg<'a, T> {
                     None
                 }
             } else if Some(c) == self.short {
-                *arg = &arg[1..]; // What if c is not 1 byte?
-                let result = if self.name.is_empty() {
-                    (self.action)("")
-                } else if arg.is_empty() {
-                    if let Some(next) = rest.next() {
-                        (self.action)(&next)
+                let pair = if self.name.is_empty() {
+                    ((self.action)(""), rest)
+                } else if rest.is_empty() {
+                    if let Some(next) = args.next() {
+                        ((self.action)(&next), "")
                     } else {
-                        Err(Error::from_string("requires parameter"))
+                        (Err(Error::from_string("requires parameter")), "")
                     }
                 } else {
-                    let param = mem::replace(arg, "");
-                    (self.action)(param)
+                    ((self.action)(rest), "")
                 };
-                Some(result)
+                Some(pair)
             } else {
                 None
             }
         } else if self.name.is_empty() {
-            *arg = "";
-            Some((self.action)("-"))
+            Some(((self.action)("-"), ""))
         } else {
             None
-        }.map(|result|
-            result.map_err(|e| e.with_option(orig)))
+        }.map(|(result, rest)| (result.map_err(|e| e.with_option(arg)), rest))
     }
 }
 

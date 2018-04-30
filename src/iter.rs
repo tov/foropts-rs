@@ -42,19 +42,18 @@ impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
             let result = match arg.chars().next() {
                 Some('-') => {
                     arg = &arg[1..];
-                    let orig = arg;
 
-                    let result = self.config.get_args().into_iter()
-                        .filter_map(|each| each.parse_optional(&mut arg, &mut self.args))
-                        .next()
-                        .unwrap_or_else(||
-                            Err(Error::from_string("unrecognized").with_option(orig)));
+                    for each in self.config.get_args() {
+                        if let Some((result, rest)) = each.parse_optional(arg, &mut self.args) {
+                            if !rest.is_empty() {
+                                self.push_back = Some(format!("-{}", rest));
+                            }
 
-                    if !arg.is_empty() {
-                        self.push_back = Some(format!("-{}", arg));
+                            return Some(result);
+                        }
                     }
 
-                    result
+                    Err(Error::from_string("unrecognized").with_option(arg))
                 }
 
                 Some(_)   => self.config.parse_positional(arg),
