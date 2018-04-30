@@ -4,7 +4,7 @@ use std::result;
 use std::str::FromStr;
 
 #[derive(Debug)]
-pub struct Builder<'a, T> {
+pub struct Config<'a, T> {
     name:       String,
     version:    Option<String>,
     author:     Option<String>,
@@ -32,7 +32,7 @@ pub struct Error {
 pub struct Iter<'a, 'b: 'a, I, T: 'a>
     where I: IntoIterator<Item=String>
 {
-    config:     &'a Builder<'b, T>,
+    config:     &'a Config<'b, T>,
     args:       I::IntoIter,
     push_back:  Option<String>,
     positional: bool,
@@ -73,10 +73,10 @@ impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
     }
 }
 
-impl<'a, T> Builder<'a, T> {
+impl<'a, T> Config<'a, T> {
     /// Creates a new `foropts::Builder` given the name of the program.
     pub fn new<S: Into<String>>(name: S) -> Self {
-        Builder {
+        Config {
             name:    name.into(),
             version: None,
             author:  None,
@@ -280,7 +280,7 @@ pub fn parse_map<'a, A, B, F>(slice: &'a str, success: F) -> Result<B>
 
 #[cfg(test)]
 mod tests {
-    use super::{Builder, Arg, parse_map, Result};
+    use super::{Config, Arg, parse_map, Result};
 
     #[derive(Clone, PartialEq, Debug)]
     enum Opt {
@@ -345,13 +345,13 @@ mod tests {
     }
 
     fn parse(args: &[&str]) -> Result<Vec<Opt>> {
-        let builder = get_builder();
+        let config = get_config();
         let args = args.into_iter().map(ToString::to_string);
-        builder.iter(args).collect()
+        config.iter(args).collect()
     }
 
-    fn get_builder() -> Builder<'static, Opt> {
-        Builder::new("moo")
+    fn get_config() -> Config<'static, Opt> {
+        Config::new("moo")
             .arg(Arg::flag(|| Opt::Louder).short('l').long("louder"))
             .arg(Arg::flag(|| Opt::Softer).short('s').long("softer"))
             .arg(Arg::param("FREQ", |s| parse_map(s, Opt::Freq)).short('f').long("freq"))
