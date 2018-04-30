@@ -6,10 +6,45 @@
 //!
 //! # Examples
 //!
-//! In this example, we accept
+//! In this example, we accept one boolean flag, `-v` (or `--verbose`), and two
+//! string options, `-b` (or `--before`) and `-a` (or `--after`). The string options
+//! build a string, where the relative order of the appearances of `-a` and `-b` matters.
+//! This is hard to do when your arguments are treated as a multimap, but easy when
+//! you can iterate over them sequentially.
 //!
 //! ```
 //! # use foropts::*;
+//! enum Opt {
+//!     Before(String),
+//!     After(String),
+//!     Verbose,
+//! }
+//!
+//! let config =
+//!     Config::new("build_string_example")
+//!         .arg(Arg::parsed_param("BEFORE", Opt::Before)
+//!              .short('b').long("before"))
+//!         .arg(Arg::parsed_param("AFTER", Opt::After)
+//!              .short('a').long("after"))
+//!         .arg(Arg::flag(|| Opt::Verbose)
+//!              .short('v').long("verbose"));
+//!
+//! let mut verbose     = false;
+//! let mut accumulator = String::new();
+//!
+//! let opts = ["-b1", "-va", "2", "--after=3", "--before", "4"]
+//!     .iter().map(ToString::to_string);
+//!
+//! for opt in config.iter(opts) {
+//!     match opt.unwrap() {
+//!         Opt::Before(s) => accumulator = s + &accumulator,
+//!         Opt::After(s)  => accumulator = accumulator + &s,
+//!         Opt::Verbose   => verbose = true,
+//!     }
+//! }
+//!
+//! assert_eq!( "4123", accumulator );
+//! assert!( verbose );
 //! ```
 use std::str::FromStr;
 
@@ -29,78 +64,91 @@ pub use iter::Iter;
 mod tests {
     use super::{Config, Arg, Result};
 
+    #[test]
+    fn char_example() {
+        let config =
+            Config::new("char_example")
+                .arg(Arg::flag(|| 'a').short('a'))
+                .arg(Arg::flag(|| 'b').short('b'));
+
+        let opts = ["-ab", "-ba"].iter().map(ToString::to_string);
+        let result: Result<String> = config.iter(opts).collect();
+        assert_eq!( Ok("abba".to_owned()), result );
+    }
+
     #[derive(Clone, PartialEq, Debug)]
-    enum Opt {
+    enum FLS {
+        Freq(f32),
         Louder,
         Softer,
-        Freq(f32),
     }
 
     #[test]
     fn flag_s() {
-        assert_parse(&["-s"], &[Opt::Softer]);
+        assert_parse(&fls_config(), &["-s"], &[FLS::Softer]);
     }
 
     #[test]
     fn flag_s_s() {
-        assert_parse(&["-ss"], &[Opt::Softer, Opt::Softer]);
+        assert_parse(&fls_config(), &["-ss"], &[FLS::Softer, FLS::Softer]);
     }
 
     #[test]
     fn flag_softer() {
-        assert_parse(&["--softer"], &[Opt::Softer]);
+        assert_parse(&fls_config(), &["--softer"], &[FLS::Softer]);
     }
 
     #[test]
     fn flag_s_l_s() {
-        let expected = &[Opt::Softer, Opt::Louder, Opt::Softer];
-        assert_parse(&["-sls"], expected);
-        assert_parse(&["-s", "-ls"], expected);
-        assert_parse(&["-sl", "-s"], expected);
-        assert_parse(&["-s", "-l", "-s"], expected);
+        let config = &fls_config();
+        let expected = &[FLS::Softer, FLS::Louder, FLS::Softer];
+        assert_parse(config, &["-sls"], expected);
+        assert_parse(config, &["-s", "-ls"], expected);
+        assert_parse(config, &["-sl", "-s"], expected);
+        assert_parse(config, &["-s", "-l", "-s"], expected);
     }
 
     #[test]
     fn flag_f_needs_param() {
-        assert_parse_error(&["-f"]);
+        assert_parse_error(&fls_config(), &["-f"]);
     }
 
     #[test]
     fn flag_freq_needs_param() {
-        assert_parse_error(&["--freq"]);
+        assert_parse_error(&fls_config(), &["--freq"]);
     }
 
     #[test]
     fn flag_freq_needs_float_param() {
-        assert_parse_error(&["-fhello"]);
-        assert_parse_error(&["-f", "hello"]);
-        assert_parse_error(&["--freq=hello"]);
-        assert_parse_error(&["--freq", "hello"]);
+        let config = &fls_config();
+        assert_parse_error(config, &["-fhello"]);
+        assert_parse_error(config, &["-f", "hello"]);
+        assert_parse_error(config, &["--freq=hello"]);
+        assert_parse_error(config, &["--freq", "hello"]);
 
-        assert_parse(&["-f5.5"], &[Opt::Freq(5.5)]);
-        assert_parse(&["-f", "5.5"], &[Opt::Freq(5.5)]);
-        assert_parse(&["--freq=5.5"], &[Opt::Freq(5.5)]);
-        assert_parse(&["--freq", "5.5"], &[Opt::Freq(5.5)]);
+        assert_parse(config, &["-f5.5"], &[FLS::Freq(5.5)]);
+        assert_parse(config, &["-f", "5.5"], &[FLS::Freq(5.5)]);
+        assert_parse(config, &["--freq=5.5"], &[FLS::Freq(5.5)]);
+        assert_parse(config, &["--freq", "5.5"], &[FLS::Freq(5.5)]);
     }
 
-    fn assert_parse_error(args: &[&str]) {
-        assert!( parse(args).is_err() );
+    fn fls_config() -> Config<'static, FLS> {
+        Config::new("fls")
+            .arg(Arg::parsed_param("FREQ", FLS::Freq).short('f').long("freq"))
+            .arg(Arg::flag(|| FLS::Louder).short('l').long("louder"))
+            .arg(Arg::flag(|| FLS::Softer).short('s').long("softer"))
     }
 
-    fn assert_parse(args: &[&str], expected: &[Opt]) {
-        assert_eq!( parse(args), Ok(expected.to_owned()) );
+    fn assert_parse_error(config: &Config<FLS>, args: &[&str]) {
+        assert!( parse(config, args).is_err() );
     }
 
-    fn parse(args: &[&str]) -> Result<Vec<Opt>> {
-        let config = get_config();
+    fn assert_parse(config: &Config<FLS>, args: &[&str], expected: &[FLS]) {
+        assert_eq!( parse(config, args), Ok(expected.to_owned()) );
+    }
+
+    fn parse(config: &Config<FLS>, args: &[&str]) -> Result<Vec<FLS>> {
         let args = args.into_iter().map(ToString::to_string);
         config.iter(args).collect()
-    }
-
-    fn get_config() -> Config<'static, Opt> {
-        Config::new("moo")
-            .arg(Arg::flag(|| Opt::Louder).short('l').long("louder"))
-            .arg(Arg::flag(|| Opt::Softer).short('s').long("softer"))
-            .arg(Arg::parsed_param("FREQ", Opt::Freq).short('f').long("freq"))
     }
 }
