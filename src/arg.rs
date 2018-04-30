@@ -26,10 +26,10 @@ impl<'a, T> Arg<'a, T> {
     pub fn flag<F>(thunk: F) -> Self
         where F: Fn() -> T + 'a
     {
-        Self::param("", move |_| Ok(thunk()))
+        Self::with_param("", move |_| Ok(thunk()))
     }
 
-    pub fn param<S, F>(name: S, parser: F) -> Self
+    pub fn with_param<S, F>(name: S, parser: F) -> Self
         where S: Into<String>,
               F: Fn(&str) -> Result<T> + 'a
     {
@@ -39,6 +39,18 @@ impl<'a, T> Arg<'a, T> {
             short:      None,
             long:       String::new(),
         }
+    }
+
+    pub fn parsed_param<A, S, F>(name: S, wrapper: F) -> Self
+        where S: Into<String>,
+              F: Fn(A) -> T + 'a,
+              A: FromStr,
+              A::Err: ToString
+    {
+        Arg::with_param(name, move |slice|
+            slice.parse()
+                .map(&wrapper)
+                .map_err(|s| Error::from_string(&s)))
     }
 
     /// Sets the short name of the option.

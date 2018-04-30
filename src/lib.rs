@@ -12,17 +12,9 @@ pub use config::Config;
 pub use error::{Error, Result};
 pub use iter::Iter;
 
-pub fn parse_map<A, B, F>(slice: &str, success: F) -> Result<B>
-    where A: FromStr,
-          A::Err: ToString,
-          F: FnOnce(A) -> B
-{
-    slice.parse().map(success).map_err(|s| Error::from_string(&s))
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{Config, Arg, parse_map, Result};
+    use super::{Config, Arg, Result};
 
     #[derive(Clone, PartialEq, Debug)]
     enum Opt {
@@ -96,6 +88,6 @@ mod tests {
         Config::new("moo")
             .arg(Arg::flag(|| Opt::Louder).short('l').long("louder"))
             .arg(Arg::flag(|| Opt::Softer).short('s').long("softer"))
-            .arg(Arg::param("FREQ", |s| parse_map(s, Opt::Freq)).short('f').long("freq"))
+            .arg(Arg::parsed_param("FREQ", Opt::Freq).short('f').long("freq"))
     }
 }
