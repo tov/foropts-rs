@@ -103,6 +103,18 @@ impl<'a, T> Config<'a, T> {
         exit(1);
     }
 
+    /// Prints usage information to stdout and exits with code 0.
+    pub fn exit_usage(&self) -> ! {
+        self.write_usage(io::stdout()).unwrap();
+        exit(0);
+    }
+
+    /// Prints version information to stdout and exits with code 0.
+    pub fn exit_version(&self) -> ! {
+        self.write_version(io::stdout()).unwrap();
+        exit(0);
+    }
+
     /// Writes version information to the given `Write`.
     pub fn write_version<W: io::Write>(&self, mut out: W) -> io::Result<()> {
         write!(out, "{}", self.name)?;
