@@ -1,4 +1,6 @@
+use util::*;
 use super::*;
+
 use std::{fmt, mem};
 
 /// A description of an argument, which may be a flag or have a parameter.
@@ -52,12 +54,12 @@ impl<'a, T> Arg<'a, T> {
         self
     }
 
-    pub fn get_short(&self) -> Option<char> {
+    pub (crate) fn get_short(&self) -> Option<char> {
         self.short
     }
 
-    pub fn get_long(&self) -> Option<&str> {
-        if self.long.is_empty() {None} else { Some(&self.long) }
+    pub (crate) fn get_long(&self) -> Option<&str> {
+        non_empty_string(&self.long)
     }
 
     pub (crate) fn parse_positional(&self, arg: &str) -> Option<Result<T>> {

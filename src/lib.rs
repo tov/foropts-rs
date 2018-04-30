@@ -1,14 +1,16 @@
 use std::str::FromStr;
 
-mod config;
-mod arg;
-mod iter;
-mod error;
+mod util;
 
-pub use config::Config;
+mod arg;
+mod config;
+mod error;
+mod iter;
+
 pub use arg::Arg;
-pub use iter::Iter;
+pub use config::Config;
 pub use error::{Error, Result};
+pub use iter::Iter;
 
 pub fn parse_map<'a, A, B, F>(slice: &'a str, success: F) -> Result<B>
     where A: FromStr,
