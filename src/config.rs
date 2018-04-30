@@ -137,7 +137,7 @@ impl<'a, T> Config<'a, T> {
 
         self.write_usage_line(&mut out)?;
 
-        writeln!(out, "OPTIONS:")?;
+        writeln!(out, "\nOPTIONS:")?;
         for arg in &self.args {
             arg.write_option_usage(&mut out)?;
         }

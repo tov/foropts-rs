@@ -113,12 +113,12 @@ impl<'a, T> Arg<'a, T> {
 
         if let Some(c) = self.short {
             if self.long.is_empty() {
-                write!(out, "-{}", c)?;
+                write!(out, "  -{}", c)?;
             } else {
-                write!(out, "-{}, --{}", c, self.long)?;
+                write!(out, "  -{}, --{}", c, self.long)?;
             }
         } else {
-            write!(out, "--{}", self.long)?;
+            write!(out, "  --{}", self.long)?;
         }
 
         if !self.name.is_empty() {
@@ -134,12 +134,12 @@ impl<'a, T> Arg<'a, T> {
 
     pub (crate) fn positional_name(&self) -> Option<&str> {
         if self.short.is_none() && self.long.is_empty() {
-            None
-        } else if self.name.is_empty() {
-            Some(&"ARG")
-        } else {
-            Some(&self.name)
-        }
+            if self.name.is_empty() {
+                Some(&"ARG")
+            } else {
+                Some(&self.name)
+            }
+        } else {None}
     }
 
     /// Checks that this `Arg` and another `Arg` don't claim the same option names.
