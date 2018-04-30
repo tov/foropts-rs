@@ -4,6 +4,22 @@
 //! multimap; `foropts` treats the arguments as a sequence. This usually isn’t what you want, but
 //! occasionally it is.
 //!
+//! # Usage
+//!
+//! It's on [crates.io](https://crates.io/crates/foropts), so you can add
+//!
+//! ```toml
+//! foropts = "0.1"
+//! ```
+//!
+//! to your `Cargo.toml` and
+//!
+//! ```rust
+//! extern crate foropts;
+//! ```
+//!
+//! to your crate root.
+//!
 //! # Example
 //!
 //! In this example, we accept one boolean flag, `-v` (or `--verbose`), and two
@@ -13,7 +29,7 @@
 //! you can iterate over them sequentially.
 //!
 //! ```
-//! # use foropts::*;
+//! # use foropts;
 //! enum Opt {
 //!     Before(String),
 //!     After(String),
@@ -21,12 +37,12 @@
 //! }
 //!
 //! let config =
-//!     Config::new("build_string_example")
-//!         .arg(Arg::parsed_param("BEFORE", Opt::Before)
+//!     foropts::Config::new("build_string_example")
+//!         .arg(foropts::Arg::parsed_param("BEFORE", Opt::Before)
 //!              .short('b').long("before"))
-//!         .arg(Arg::parsed_param("AFTER", Opt::After)
+//!         .arg(foropts::Arg::parsed_param("AFTER", Opt::After)
 //!              .short('a').long("after"))
-//!         .arg(Arg::flag(|| Opt::Verbose)
+//!         .arg(foropts::Arg::flag(|| Opt::Verbose)
 //!              .short('v').long("verbose"));
 //!
 //! let mut verbose     = false;
