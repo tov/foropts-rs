@@ -2,11 +2,11 @@ use super::*;
 
 #[derive(Debug)]
 pub struct Config<'a, T> {
-    pub (crate) name:       String,
-    pub (crate) version:    Option<String>,
-    pub (crate) author:     Option<String>,
-    pub (crate) about:      Option<String>,
-    pub (crate) args:       Vec<Arg<'a, T>>,
+    name:       String,
+    version:    Option<String>,
+    author:     Option<String>,
+    about:      Option<String>,
+    args:       Vec<Arg<'a, T>>,
 }
 
 impl<'a, T> Config<'a, T> {
@@ -47,13 +47,13 @@ impl<'a, T> Config<'a, T> {
 
     fn add_arg(&mut self, arg: Arg<'a, T>) {
         for each in &self.args {
-            match (each.short, arg.short) {
-                (Some(c1), Some(c2)) =>
-                    assert_ne!( c1, c2, "foropts::Builder::arg: repeat of short option" ),
-                _ => (),
+            if let (Some(c1), Some(c2)) = (each.get_short(), arg.get_short()) {
+                assert_ne!( c1, c2, "foropts::Builder::arg: repeat of short option" );
             }
-            assert_ne!( each.long, arg.long,
-                        "foropts::Builder::arg: repeat of long option" );
+
+            if let (Some(s1), Some(s2)) = (each.get_long(), arg.get_long()) {
+                assert_ne!( s1, s2, "foropts::Builder::arg: repeat of long option" );
+            }
         }
 
         self.args.push(arg);
@@ -75,12 +75,7 @@ impl<'a, T> Config<'a, T> {
 
     /// Given an iterator over the arguments, returns an iterator that parses the results.
     pub fn iter<'b, I: IntoIterator<Item=String>>(&'b self, args: I) -> Iter<'b, 'a, I, T> {
-        Iter {
-            config:     self,
-            args:       args.into_iter(),
-            push_back:  None,
-            positional: false,
-        }
+        Iter::new(self, args)
     }
 
     pub (crate) fn parse_positional(&self, arg: &str) -> Option<Result<T>> {
@@ -91,6 +86,10 @@ impl<'a, T> Config<'a, T> {
         }
 
         None
+    }
+
+    pub (crate) fn get_args(&self) -> &[Arg<'a, T>] {
+        &self.args
     }
 }
 

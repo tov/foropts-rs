@@ -4,10 +4,10 @@ use super::*;
 pub struct Iter<'a, 'b: 'a, I, T: 'a>
     where I: IntoIterator<Item=String>
 {
-    pub (crate) config:     &'a Config<'b, T>,
-    pub (crate) args:       I::IntoIter,
-    pub (crate) push_back:  Option<String>,
-    pub (crate) positional: bool,
+    config:     &'a Config<'b, T>,
+    args:       I::IntoIter,
+    push_back:  Option<String>,
+    positional: bool,
 }
 
 impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
@@ -23,7 +23,7 @@ impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
                 if c == '-' {
                     arg = &arg[1..];
 
-                    for each in &self.config.args {
+                    for each in self.config.get_args() {
                         if let Some(result) = each.parse_optional(&mut arg, &mut self.args) {
                             if !arg.is_empty() {
                                 self.push_back = Some(format!("-{}", arg));
@@ -45,3 +45,15 @@ impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
     }
 }
 
+impl<'a, 'b, I, T> Iter<'a, 'b, I, T>
+    where I: IntoIterator<Item=String>
+{
+    pub (crate) fn new(config: &'a Config<'b, T>, args: I) -> Self {
+        Iter {
+            config,
+            args:       args.into_iter(),
+            push_back:  None,
+            positional: false,
+        }
+    }
+}

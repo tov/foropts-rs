@@ -3,10 +3,10 @@ use std::{fmt, mem};
 
 /// A description of an argument, which may be a flag or have a parameter.
 pub struct Arg<'a, T> {
-    pub (crate) name:       String,
-    pub (crate) action:     Box<Fn(&str) -> Result<T> + 'a>,
-    pub (crate) short:      Option<char>,
-    pub (crate) long:       String,
+    name:       String,
+    action:     Box<Fn(&str) -> Result<T> + 'a>,
+    short:      Option<char>,
+    long:       String,
 }
 
 impl<'a, T> fmt::Debug for Arg<'a, T> {
@@ -50,6 +50,14 @@ impl<'a, T> Arg<'a, T> {
     pub fn long<'b, S: Into<String>>(mut self, s: S) -> Self {
         self.long = s.into();
         self
+    }
+
+    pub fn get_short(&self) -> Option<char> {
+        self.short
+    }
+
+    pub fn get_long(&self) -> Option<&str> {
+        if self.long.is_empty() {None} else { Some(&self.long) }
     }
 
     pub (crate) fn parse_positional(&self, arg: &str) -> Option<Result<T>> {
