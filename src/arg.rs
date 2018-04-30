@@ -4,6 +4,12 @@ use super::*;
 use std::{fmt, mem};
 
 /// A description of an argument, which may be a Boolean flag or carry a parameter.
+///
+/// # Parameters
+///
+/// `<'a>` – The lifetime of the argument’s action
+///
+/// `<T>`  – The result type of the argument
 pub struct Arg<'a, T> {
     name:       String,
     action:     Box<Fn(&str) -> Result<T> + 'a>,
@@ -23,12 +29,25 @@ impl<'a, T> fmt::Debug for Arg<'a, T> {
 }
 
 impl<'a, T> Arg<'a, T> {
+    /// Creates a new Boolean flag whose action is the given thunk.
     pub fn flag<F>(thunk: F) -> Self
         where F: Fn() -> T + 'a
     {
         Self::str_param("", move |_| Ok(thunk()))
     }
 
+    /// Creates a new argument with raw string parameter.
+    ///
+    /// # Parameters
+    ///
+    /// `<S>` – type converted to `String` to name the parameter
+    ///
+    /// `<F>` – type of parsing function
+    ///
+    /// `name` – the name of the parameter
+    ///
+    /// `parser` – the parsing function, which must convert the raw
+    /// `&str` to a `Result<T>`
     pub fn str_param<S, F>(name: S, parser: F) -> Self
         where S: Into<String>,
               F: Fn(&str) -> Result<T> + 'a
@@ -41,6 +60,19 @@ impl<'a, T> Arg<'a, T> {
         }
     }
 
+    /// Creates a new argument with a parameter parsed by `str::parse`.
+    ///
+    /// # Parameters
+    ///
+    /// `<A>` – type into which the raw `&str` will be automatically parsed
+    ///
+    /// `<S>` – type converted to `String` to name the parameter
+    ///
+    /// `<F>` – type of the wrapping function
+    ///
+    /// `name` – the name of the parameter
+    ///
+    /// `wrapper` – function applied to successful parsing result to transform `A` to `T`
     pub fn parsed_param<A, S, F>(name: S, wrapper: F) -> Self
         where S: Into<String>,
               F: Fn(A) -> T + 'a,
@@ -66,6 +98,7 @@ impl<'a, T> Arg<'a, T> {
         self
     }
 
+    /// Checks that this `Arg` and another `Arg` don't claim the same option names.
     pub (crate) fn check_interference<'b, U>(&self, other: &Arg<'b, U>) -> Result<()> {
         if let (Some(c1), Some(c2)) = (self.short, other.short) {
             if c1 == c2 {
@@ -85,12 +118,31 @@ impl<'a, T> Arg<'a, T> {
         Ok(())
     }
 
+    /// Parses a position parameter, provided the given `Arg` accepts one.
+    ///
+    /// An `Arg` accepts a positional parameter when it has no short nor
+    /// long option names.
     pub (crate) fn parse_positional(&self, arg: &str) -> Option<Result<T>> {
         if self.short.is_none() && self.long.is_empty() {
             Some((self.action)(arg))
         } else {None}
     }
 
+    /// Attempts to parse an optional (non-positional) parameter.
+    ///
+    /// # Parameters
+    ///
+    /// `<I>` – the underlying iterator type
+    ///
+    /// `&self` – the formal `Arg` we are looking for
+    ///
+    /// `arg` – the actual argument we are are attempting to parse
+    ///
+    /// `rest` – the iterator from which to extract additional raw arguments
+    ///
+    /// Note that `arg` should not include the leading hyphen (`'-'`), but should include the
+    /// second hyphen if it’s a long argument. The pointer `arg` will be updated to contain a slice
+    /// with any remaining, unprocessed portion of the argument.
     pub (crate) fn parse_optional<I>(&self, arg: &mut &str, rest: &mut I) -> Option<Result<T>>
         where I: Iterator<Item=String>
     {

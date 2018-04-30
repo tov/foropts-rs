@@ -2,15 +2,15 @@ use super::*;
 
 /// The iterator over the processed arguments.
 ///
-/// # Params
+/// # Parameters
 ///
-/// `'a` – the lifetime of app’s [`Config`](struct.Config.html)
+/// `<'a>` – the lifetime of app’s [`Config`](struct.Config.html)
 ///
-/// `'b` - the lifetime of the argument processing actions (closures) in the `Config`
+/// `<'b>` - the lifetime of the argument processing actions (closures) in the `Config`
 ///
-/// `I`  – the underlying `String` iterator from which we are getting the unprocessed arguments
+/// `<I>`  – the underlying `String` iterator from which we are getting the unprocessed arguments
 ///
-/// `T`  – the type into which each argument is parsed
+/// `<T>`  – the type into which each argument is parsed
 #[derive(Debug)]
 pub struct Iter<'a, 'b: 'a, I, T: 'a>
     where I: IntoIterator<Item=String>
@@ -59,6 +59,8 @@ impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
 impl<'a, 'b, I, T> Iter<'a, 'b, I, T>
     where I: IntoIterator<Item=String>
 {
+    /// Creates a new `foropts::Iter` from a reference to the
+    /// configuration and an iterator over the unparsed arguments.
     pub (crate) fn new(config: &'a Config<'b, T>, args: I) -> Self {
         Iter {
             config,

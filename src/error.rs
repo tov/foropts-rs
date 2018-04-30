@@ -10,6 +10,7 @@ pub struct Error {
 }
 
 impl Error {
+    /// Creates an argument error from any type that can be stringified.
     pub fn from_string<S: ToString>(e: &S) -> Self {
         Error {
             message: e.to_string(),

@@ -1,6 +1,12 @@
 use super::*;
 
 /// The configuration for the argument parser.
+///
+/// # Parameters
+///
+/// `<'a>` – The lifetime of the arguments’ actions
+///
+/// `<T>`  – The result type that each argument will be parsed into
 #[derive(Debug)]
 pub struct Config<'a, T> {
     name:       String,
@@ -80,7 +86,8 @@ impl<'a, T> Config<'a, T> {
         self
     }
 
-    /// Given an iterator over the arguments, returns an iterator that parses the results.
+    /// Given an iterator over the unparsed arguments, returns an iterator over the
+    /// parsed arguments.
     pub fn iter<'b, I: IntoIterator<Item=String>>(&'b self, args: I) -> Iter<'b, 'a, I, T> {
         Iter::new(self, args)
     }
