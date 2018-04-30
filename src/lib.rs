@@ -1,4 +1,5 @@
 use std::fmt;
+use std::mem;
 use std::result;
 use std::str::FromStr;
 
@@ -15,17 +16,61 @@ pub struct Builder<'a, T> {
 pub struct Arg<'a, T> {
     name:       String,
     action:     Box<Fn(&str) -> Result<T> + 'a>,
-    short:      String,
+    short:      Option<char>,
     long:       String,
-    equals:     String,
 }
 
 /// The result type for argument parsers.
 pub type Result<T> = result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Error {
     message: String,
+}
+
+#[derive(Debug)]
+pub struct Iter<'a, 'b: 'a, I, T: 'a>
+    where I: IntoIterator<Item=String>
+{
+    config:     &'a Builder<'b, T>,
+    args:       I::IntoIter,
+    push_back:  Option<String>,
+    positional: bool,
+}
+
+impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
+    where I: IntoIterator<Item=String>
+{
+    type Item = Result<T>;
+
+    fn next(&mut self) -> Option<Result<T>> {
+        self.push_back.take().or_else(|| self.args.next()).and_then(|item| {
+            let mut arg = item.as_str();
+
+            if let Some(c) = arg.chars().next() {
+                if c == '-' {
+                    arg = &arg[1..];
+
+                    for each in &self.config.args {
+                        if let Some(result) = each.parse_optional(&mut arg, &mut self.args) {
+                            if arg != "" {
+                                self.push_back = Some(format!("-{}", arg));
+                            }
+
+                            return Some(result);
+                        }
+                    }
+
+                    let msg = format!("Unknown option: -{}", arg);
+                    Some(Err(Error::from_string(msg)))
+                } else {
+                    self.config.parse_positional(arg)
+                }
+            } else {
+                self.config.parse_positional("")
+            }
+        })
+    }
 }
 
 impl<'a, T> Builder<'a, T> {
@@ -65,13 +110,12 @@ impl<'a, T> Builder<'a, T> {
     }
 
     fn add_arg(&mut self, arg: Arg<'a, T>) {
-//        if arg.short.is_empty() && arg.long.is_empty() {
-//            panic!("foropts::Builder::arg: nameless flag")
-//        }
-
         for each in &self.args {
-            assert_ne!( each.short, arg.short,
-                        "foropts::Builder::arg: repeat of short option" );
+            match (each.short, arg.short) {
+                (Some(c1), Some(c2)) =>
+                    assert_ne!( c1, c2, "foropts::Builder::arg: repeat of short option" ),
+                _ => (),
+            }
             assert_ne!( each.long, arg.long,
                         "foropts::Builder::arg: repeat of long option" );
         }
@@ -92,6 +136,26 @@ impl<'a, T> Builder<'a, T> {
         }
         self
     }
+
+    /// Given an iterator over the arguments, returns an iterator that parses the results.
+    pub fn iter<'b, I: IntoIterator<Item=String>>(&'b self, args: I) -> Iter<'b, 'a, I, T> {
+        Iter {
+            config:     self,
+            args:       args.into_iter(),
+            push_back:  None,
+            positional: false,
+        }
+    }
+
+    fn parse_positional(&self, arg: &str) -> Option<Result<T>> {
+        for each in &self.args {
+            if let Some(result) = each.parse_positional(arg) {
+                return Some(result)
+            }
+        }
+
+        None
+    }
 }
 
 impl<'a, T> Arg<'a, T> {
@@ -108,25 +172,83 @@ impl<'a, T> Arg<'a, T> {
         Arg {
             name:       name.into(),
             action:     Box::new(parser),
-            short:      String::new(),
+            short:      None,
             long:       String::new(),
-            equals:     String::new(),
         }
     }
 
     /// Sets the short name of the option.
     pub fn short(mut self, c: char) -> Self {
         assert_ne!( c, '-' , "Arg::short: c cannot be '-'" );
-        self.short = format!("-{}", c);
+        self.short = Some(c);
         self
     }
 
     /// Sets the long name of the option.
-    pub fn long<'b, S: Into<&'b str>>(mut self, s: S) -> Self {
-        let s = s.into();
-        self.long = format!("--{}", s);
-        self.equals = format!("--{}=", s);
+    pub fn long<'b, S: Into<String>>(mut self, s: S) -> Self {
+        self.long = s.into();
         self
+    }
+
+    fn parse_positional(&self, arg: &str) -> Option<Result<T>> {
+        if self.short.is_none() && self.long.is_empty() {
+            Some((self.action)(arg))
+        } else {None}
+    }
+
+    fn parse_optional<I>(&self, arg: &mut &str, rest: &mut I) -> Option<Result<T>>
+        where I: Iterator<Item=String>
+    {
+        if let Some(c) = arg.chars().next() {
+            if c == '-' {
+                *arg = &arg[1..];
+                if *arg == self.long {
+                    *arg = "";
+                    if self.name.is_empty() {
+                        Some((self.action)(""))
+                    } else if let Some(next) = rest.next() {
+                        Some((self.action)(&next))
+                    } else {
+                        let msg = format!("Option --{} requires parameter", self.long);
+                        Some(Err(Error::from_string(msg)))
+                    }
+                } else if let Some(index) = arg.find('=') {
+                    if arg[..index] == self.long {
+                        let param = &arg[index + 1..];
+                        *arg = "";
+                        Some((self.action)(param))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else if Some(c) == self.short {
+                *arg = &arg[1..];
+                if self.name.is_empty() {
+                    Some((self.action)(""))
+                } else if arg.is_empty() {
+                    if let Some(next) = rest.next() {
+                        Some((self.action)(&next))
+                    } else {
+                        let msg = format!("Option -{} requires parameter", c);
+                        Some(Err(Error::from_string(msg)))
+                    }
+                } else {
+                    let param = mem::replace(arg, "");
+                    Some((self.action)(param))
+                }
+            } else {
+                None
+            }
+        } else {
+            if self.name.is_empty() {
+                *arg = "";
+                Some((self.action)("-"))
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -145,7 +267,6 @@ impl<'a, T> fmt::Debug for Arg<'a, T> {
             .field("action",    &"…")
             .field("short",     &self.short)
             .field("long",      &self.long)
-            .field("equals",    &self.equals)
             .finish()
     }
 }
@@ -160,8 +281,9 @@ pub fn parse_map<'a, A, B, F>(slice: &'a str, success: F) -> Result<B>
 
 #[cfg(test)]
 mod tests {
-    use super::{Builder, Arg, parse_map};
+    use super::{Builder, Arg, parse_map, Result};
 
+    #[derive(PartialEq, Debug)]
     enum MooOpt {
         Louder,
         Softer,
@@ -170,10 +292,15 @@ mod tests {
 
     #[test]
     fn moo() {
-        let _builder = Builder::new("moo")
+        let builder = Builder::new("moo")
             .arg(Arg::flag(|| MooOpt::Louder).short('l').long("louder"))
             .arg(Arg::flag(|| MooOpt::Softer).short('s').long("softer"))
             .arg(Arg::param("FREQ", |s| parse_map(s, MooOpt::Freq))
                 .short('f').long("freq"));
+        let args = vec!["-l", "-s", "-f17.8"].into_iter().map(ToString::to_string);
+        let result: Result<Vec<_>> = builder.iter(args).collect();
+
+        assert_eq!( result,
+                    Ok(vec![MooOpt::Louder, MooOpt::Softer, MooOpt::Freq(17.8)]) );
     }
 }
