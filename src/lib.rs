@@ -63,6 +63,7 @@ pub use iter::Iter;
 #[cfg(test)]
 mod tests {
     use super::{Config, Arg, Result};
+    use std::fmt::Debug;
 
     #[test]
     fn char_example() {
@@ -139,15 +140,18 @@ mod tests {
             .arg(Arg::flag(|| FLS::Softer).short('s').long("softer"))
     }
 
-    fn assert_parse_error(config: &Config<FLS>, args: &[&str]) {
+    fn assert_parse_error<T>(config: &Config<T>, args: &[&str]) {
         assert!( parse(config, args).is_err() );
     }
 
-    fn assert_parse(config: &Config<FLS>, args: &[&str], expected: &[FLS]) {
-        assert_eq!( parse(config, args), Ok(expected.to_owned()) );
+    fn assert_parse<T>(config: &Config<T>, args: &[&str], expected: &[T])
+        where T: Debug + PartialEq
+    {
+        assert_eq!( parse(config, args).as_ref().map(Vec::as_slice),
+                    Ok(expected) );
     }
 
-    fn parse(config: &Config<FLS>, args: &[&str]) -> Result<Vec<FLS>> {
+    fn parse<T>(config: &Config<T>, args: &[&str]) -> Result<Vec<T>> {
         let args = args.into_iter().map(ToString::to_string);
         config.iter(args).collect()
     }
