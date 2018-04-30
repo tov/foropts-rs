@@ -53,7 +53,7 @@ impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
 
                     for each in &self.config.args {
                         if let Some(result) = each.parse_optional(&mut arg, &mut self.args) {
-                            if arg != "" {
+                            if !arg.is_empty() {
                                 self.push_back = Some(format!("-{}", arg));
                             }
 
@@ -201,8 +201,7 @@ impl<'a, T> Arg<'a, T> {
     {
         if let Some(c) = arg.chars().next() {
             if c == '-' {
-                *arg = &arg[1..];
-                if *arg == self.long {
+                if &arg[1..] == self.long {
                     *arg = "";
                     if self.name.is_empty() {
                         Some((self.action)(""))
@@ -213,7 +212,7 @@ impl<'a, T> Arg<'a, T> {
                         Some(Err(Error::from_string(msg)))
                     }
                 } else if let Some(index) = arg.find('=') {
-                    if arg[..index] == self.long {
+                    if &arg[1..index] == self.long {
                         let param = &arg[index + 1..];
                         *arg = "";
                         Some((self.action)(param))
@@ -283,24 +282,78 @@ pub fn parse_map<'a, A, B, F>(slice: &'a str, success: F) -> Result<B>
 mod tests {
     use super::{Builder, Arg, parse_map, Result};
 
-    #[derive(PartialEq, Debug)]
-    enum MooOpt {
+    #[derive(Clone, PartialEq, Debug)]
+    enum Opt {
         Louder,
         Softer,
         Freq(f32),
     }
 
     #[test]
-    fn moo() {
-        let builder = Builder::new("moo")
-            .arg(Arg::flag(|| MooOpt::Louder).short('l').long("louder"))
-            .arg(Arg::flag(|| MooOpt::Softer).short('s').long("softer"))
-            .arg(Arg::param("FREQ", |s| parse_map(s, MooOpt::Freq))
-                .short('f').long("freq"));
-        let args = vec!["-l", "-s", "-f17.8"].into_iter().map(ToString::to_string);
-        let result: Result<Vec<_>> = builder.iter(args).collect();
+    fn flag_s() {
+        assert_parse(&["-s"], &[Opt::Softer]);
+    }
 
-        assert_eq!( result,
-                    Ok(vec![MooOpt::Louder, MooOpt::Softer, MooOpt::Freq(17.8)]) );
+    #[test]
+    fn flag_s_s() {
+        assert_parse(&["-ss"], &[Opt::Softer, Opt::Softer]);
+    }
+
+    #[test]
+    fn flag_softer() {
+        assert_parse(&["--softer"], &[Opt::Softer]);
+    }
+
+    #[test]
+    fn flag_s_l_s() {
+        let expected = &[Opt::Softer, Opt::Louder, Opt::Softer];
+        assert_parse(&["-sls"], expected);
+        assert_parse(&["-s", "-ls"], expected);
+        assert_parse(&["-sl", "-s"], expected);
+        assert_parse(&["-s", "-l", "-s"], expected);
+    }
+
+    #[test]
+    fn flag_f_needs_param() {
+        assert_parse_error(&["-f"]);
+    }
+
+    #[test]
+    fn flag_freq_needs_param() {
+        assert_parse_error(&["--freq"]);
+    }
+
+    #[test]
+    fn flag_freq_needs_float_param() {
+        assert_parse_error(&["-fhello"]);
+        assert_parse_error(&["-f", "hello"]);
+        assert_parse_error(&["--freq=hello"]);
+        assert_parse_error(&["--freq", "hello"]);
+
+        assert_parse(&["-f5.5"], &[Opt::Freq(5.5)]);
+        assert_parse(&["-f", "5.5"], &[Opt::Freq(5.5)]);
+        assert_parse(&["--freq=5.5"], &[Opt::Freq(5.5)]);
+        assert_parse(&["--freq", "5.5"], &[Opt::Freq(5.5)]);
+    }
+
+    fn assert_parse_error(args: &[&str]) {
+        assert!( parse(args).is_err() );
+    }
+
+    fn assert_parse(args: &[&str], expected: &[Opt]) {
+        assert_eq!( parse(args), Ok(expected.to_owned()) );
+    }
+
+    fn parse(args: &[&str]) -> Result<Vec<Opt>> {
+        let builder = get_builder();
+        let args = args.into_iter().map(ToString::to_string);
+        builder.iter(args).collect()
+    }
+
+    fn get_builder() -> Builder<'static, Opt> {
+        Builder::new("moo")
+            .arg(Arg::flag(|| Opt::Louder).short('l').long("louder"))
+            .arg(Arg::flag(|| Opt::Softer).short('s').long("softer"))
+            .arg(Arg::param("FREQ", |s| parse_map(s, Opt::Freq)).short('f').long("freq"))
     }
 }
