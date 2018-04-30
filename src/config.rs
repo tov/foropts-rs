@@ -92,10 +92,11 @@ impl<'a, T> Config<'a, T> {
         Iter::new(self, args)
     }
 
-    pub (crate) fn parse_positional(&self, arg: &str) -> Option<Result<T>> {
+    pub (crate) fn parse_positional(&self, arg: &str) -> Result<T> {
         self.args.iter()
             .flat_map(|each| each.parse_positional(arg))
             .next()
+            .unwrap_or_else(|| Err(Error::from_string("unexpected positional argument")))
     }
 
     pub (crate) fn get_args(&self) -> &[Arg<'a, T>] {

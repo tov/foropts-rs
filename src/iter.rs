@@ -31,35 +31,38 @@ impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
             let mut arg = item.as_str();
 
             if self.positional {
-                return self.config.parse_positional(arg);
+                return Some(self.config.parse_positional(arg));
             }
 
             if arg == "--" {
                 self.positional = true;
-                return self.args.next().and_then(|arg| self.config.parse_positional(&arg));
+                return self.args.next().map(|arg| self.config.parse_positional(&arg));
             }
 
-            if let Some(c) = arg.chars().next() {
-                if c == '-' {
+            let result = match arg.chars().next() {
+                Some('-') => {
                     arg = &arg[1..];
+                    let orig = arg;
 
-                    for each in self.config.get_args() {
-                        if let Some(result) = each.parse_optional(&mut arg, &mut self.args) {
-                            if !arg.is_empty() {
-                                self.push_back = Some(format!("-{}", arg));
-                            }
+                    let result = self.config.get_args().into_iter()
+                        .filter_map(|each| each.parse_optional(&mut arg, &mut self.args))
+                        .next()
+                        .unwrap_or_else(||
+                            Err(Error::from_string("unrecognized").with_option(orig)));
 
-                            return Some(result);
-                        }
+                    if !arg.is_empty() {
+                        self.push_back = Some(format!("-{}", arg));
                     }
 
-                    Some(Err(Error::from_string("unrecognized").with_option(arg)))
-                } else {
-                    self.config.parse_positional(arg)
+                    result
                 }
-            } else {
-                self.config.parse_positional("")
-            }
+
+                Some(_)   => self.config.parse_positional(arg),
+
+                None      => self.config.parse_positional(""),
+            };
+
+            Some(result)
         })
     }
 }
