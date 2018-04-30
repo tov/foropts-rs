@@ -1,6 +1,7 @@
 use super::*;
 
 use std::io;
+use std::process::exit;
 
 /// The configuration for the argument parser.
 ///
@@ -92,6 +93,14 @@ impl<'a, T> Config<'a, T> {
     /// parsed arguments.
     pub fn iter<'b, I: IntoIterator<Item=String>>(&'b self, args: I) -> Iter<'b, 'a, I, T> {
         Iter::new(self, args)
+    }
+
+    /// Exits with an error message and usage information printed on stderr,
+    /// with exit code 1.
+    pub fn exit_error(&self, error: &Error) -> ! {
+        eprintln!("Syntax error: {}", error);
+        self.write_usage(io::stderr()).unwrap();
+        exit(1);
     }
 
     /// Writes version information to the given `Write`.
