@@ -5,9 +5,10 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE-APACHE)
 
-Most argument parsing libraries, such as [`clap`](https://clap.rs/) treat the arguments as a
-multimap; `foropts` treats the arguments as a sequence. This usually isn’t what you want, but
-occasionally it is.
+Most argument parsing libraries, such as
+[`clap`](https://crates.io/crates/clap) treat the arguments as a
+multimap; `foropts` treats the arguments as a sequence. This usually
+isn’t what you want, but occasionally it is.
 
 # Usage
 
@@ -33,8 +34,9 @@ build a string, where the relative order of the appearances of `-a` and `-b` mat
 This is hard to do when your arguments are treated as a multimap, but easy when
 you can iterate over them sequentially.
 
-```
-# use foropts;
+```rust
+use foropts;
+
 enum Opt {
     Before(String),
     After(String),

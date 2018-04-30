@@ -1,8 +1,9 @@
 //! An argument-parsing iterator.
 //!
-//! Most argument parsing libraries, such as [`clap`](https://clap.rs/) treat the arguments as a
-//! multimap; `foropts` treats the arguments as a sequence. This usually isn’t what you want, but
-//! occasionally it is.
+//! Most argument parsing libraries, such as
+//! [`clap`](https://crates.io/crates/clap) treat the arguments as a
+//! multimap; `foropts` treats the arguments as a sequence. This usually
+//! isn’t what you want, but occasionally it is.
 //!
 //! # Usage
 //!
