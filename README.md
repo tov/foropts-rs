@@ -59,7 +59,7 @@ let opts = ["-b1", "-va", "2", "--after=3", "--before", "4"]
     .iter().map(ToString::to_string);
 
 for opt in config.iter(opts) {
-    match opt.unwrap() {
+    match opt.unwrap_or_else(|e| config.exit_error(&e)) {
         Opt::Before(s) => accumulator = s + &accumulator,
         Opt::After(s)  => accumulator = accumulator + &s,
         Opt::Verbose   => verbose = true,
