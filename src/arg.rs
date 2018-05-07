@@ -185,8 +185,15 @@ impl<'a, T> Arg<'a, T> {
     /// `rest` – the iterator from which to extract additional raw arguments
     ///
     /// Note that `arg` should not include the leading hyphen (`'-'`), but should include the
-    /// second hyphen if it’s a long argument. The pointer `arg` will be updated to contain a slice
-    /// with any remaining, unprocessed portion of the argument.
+    /// second hyphen if it’s a long argument.
+    ///
+    /// # Result
+    ///
+    /// If this argument does not match `arg`, returns `None`, otherwise, returns `Some` of pair
+    /// of a `Result<T>` and a string slice. The `Result<T>` will be `Ok(v)` if parsing
+    /// succeeds and the argument is accepted, or `Err(e)` if the parsing fails. Additionally,
+    /// the second component of the pair will point to any remaining parameters after this one
+    /// was accepted. This is used when one-character flags are provided together, like `-abc`.
     pub (crate) fn parse_optional<'b, I>(&self, arg: &'b str, args: &mut I)
         -> Option<(Result<T>, &'b str)>
         where I: Iterator<Item=String>
