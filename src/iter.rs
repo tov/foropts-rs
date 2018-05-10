@@ -40,65 +40,66 @@ impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
     fn next(&mut self) -> Option<Result<T>> {
         use self::ArgState::*;
 
-        self.push_back.take().or_else(|| self.args.next()).and_then(|item| {
-            let arg = item.as_str();
+        let item = self.push_back.take().or_else(|| self.args.next())?;
+        let arg  = item.as_str();
 
-            if self.positional {
-                return Some(self.parse_positional(arg));
+        if self.positional {
+            return Some(self.parse_positional(arg));
+        }
+
+        match analyze_argument(arg) {
+            EndOfOptions          => {
+                self.positional = true;
+                self.args.next().as_ref().map(|s| self.parse_positional(s))
             }
 
-            match analyze_argument(arg) {
-                EndOfOptions          => {
-                    self.positional = true;
-                    self.args.next().as_ref().map(|s| self.parse_positional(s))
-                }
-
-                ShortOption(c, param) => {
-                    if let Some(arg) = self.config.get_short(c) {
-                        if arg.takes_parameter() {
-                            if !param.is_empty() {
-                                Some(arg.parse_argument(param))
-                            } else if let Some(param) = self.args.next() {
-                                Some(arg.parse_argument(&param))
-                            } else {
-                                Some(Err(arg.new_error(false, "expected option parameter")))
-                            }
+            ShortOption(c, param) => {
+                let result = if let Some(arg) = self.config.get_short(c) {
+                    if arg.takes_parameter() {
+                        if !param.is_empty() {
+                            arg.parse_argument(param)
+                        } else if let Some(param) = self.args.next() {
+                            arg.parse_argument(&param)
                         } else {
-                            if !param.is_empty() {
-                                self.push_back = Some(format!("-{}", param));
-                            }
-                            Some(arg.parse_argument(""))
+                            Err(arg.new_error(false, "expected option parameter"))
                         }
                     } else {
-                        Some(Err(Error::from_string("unrecognized")
-                            .with_option(format!("-{}", c))))
-                    }
-                }
-
-                LongOption(s, param)  => {
-                    if let Some(arg) = self.config.get_long(s) {
-                        if arg.takes_parameter() {
-                            if let Some(param) = param {
-                                Some(arg.parse_argument(param))
-                            } else if let Some(param) = self.args.next() {
-                                Some(arg.parse_argument(&param))
-                            } else {
-                                Some(Err(arg.new_error(true, "expected option parameter")))
-                            }
-                        } else if param.is_none() {
-                            Some(arg.parse_argument(""))
-                        } else {
-                            Some(Err(arg.new_error(true, "unexpected option parameter")))
+                        if !param.is_empty() {
+                            self.push_back = Some(format!("-{}", param));
                         }
-                    } else {
-                        Some(Err(Error::from_string("unrecognized")
-                            .with_option(format!("--{}", s))))
+                        arg.parse_argument("")
                     }
-                }
+                } else {
+                    Err(Error::from_string("unrecognized").with_option(format!("-{}", c)))
+                };
 
-                Positional(s)         => Some(self.parse_positional(s)),
-            }.map(|o| o.map_err(|e| e.with_option(arg)))
-        })
+                Some(result)
+            }
+
+            LongOption(s, param)  => {
+                let result = if let Some(arg) = self.config.get_long(s) {
+                    if arg.takes_parameter() {
+                        if let Some(param) = param {
+                            arg.parse_argument(param)
+                        } else if let Some(param) = self.args.next() {
+                            arg.parse_argument(&param)
+                        } else {
+                            Err(arg.new_error(true, "expected option parameter"))
+                        }
+                    } else if param.is_none() {
+                        arg.parse_argument("")
+                    } else {
+                        Err(arg.new_error(true, "unexpected option parameter"))
+                    }
+                } else {
+                    Err(Error::from_string("unrecognized").with_option(format!("--{}", s)))
+                };
+
+                Some(result)
+            }
+
+            Positional(s)         => Some(self.parse_positional(s)),
+        }.map(|o| o.map_err(|e| e.with_option(arg)))
     }
 }
 
