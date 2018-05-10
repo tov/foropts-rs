@@ -29,7 +29,7 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if !self.original.is_empty() {
-            write!(f, "option -{}: ", self.original)?;
+            write!(f, "option {}: ", self.original)?;
         }
         f.write_str(&self.message)
     }

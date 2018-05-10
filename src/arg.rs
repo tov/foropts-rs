@@ -1,5 +1,5 @@
-use util::*;
 use super::*;
+use util::*;
 
 use std::{fmt, io};
 
@@ -107,9 +107,21 @@ impl<'a, T> Arg<'a, T> {
         self
     }
 
+    pub (crate) fn new_error(&self, long: bool, msg: &str) -> Error {
+        let opt_name = if long {
+            format!("--{}", self.long)
+        } else if let Some(c) = self.short {
+            format!("-{}", c)
+        } else {
+            "-?".to_owned()
+        };
+
+        Error::from_string(msg).with_option(opt_name)
+    }
+
     /// Writes the usage for this option to the writer.
     pub (crate) fn write_option_usage<W: io::Write>(&self, mut out: W) -> io::Result<()> {
-        if self.positional_name().is_some() { return Ok(()) }
+        if self.is_positional() { return Ok(()); }
 
         if let Some(c) = self.short {
             if self.long.is_empty() {
@@ -136,20 +148,20 @@ impl<'a, T> Arg<'a, T> {
         self.short.is_none() && self.long.is_empty()
     }
 
+    pub (crate) fn takes_parameter(&self) -> bool {
+        !self.name.is_empty()
+    }
+
     pub (crate) fn get_short(&self) -> Option<char> {
         self.short
     }
 
     pub (crate) fn get_long(&self) -> Option<&str> {
-        if self.long.is_empty() {
-            None
-        } else {
-            Some(&self.long)
-        }
+        non_empty_string(&self.long)
     }
 
     pub (crate) fn positional_name(&self) -> Option<&str> {
-        if self.short.is_none() && self.long.is_empty() {
+        if self.is_positional() {
             if self.name.is_empty() {
                 Some(&"ARG")
             } else {
@@ -158,30 +170,13 @@ impl<'a, T> Arg<'a, T> {
         } else {None}
     }
 
-    /// Parses a position parameter, provided the given `Arg` accepts one.
-    ///
-    /// An `Arg` accepts a positional parameter when it has no short nor
-    /// long option names.
-    pub (crate) fn parse_positional(&self, arg: &str) -> Option<Result<T>> {
-        if self.short.is_none() && self.long.is_empty() {
-            Some((self.action)(arg))
-        } else {None}
-    }
-
-    /// Attempts to parse an optional (non-positional) parameter.
+    /// Attempts to parse an argument.
     ///
     /// # Parameters
     ///
-    /// `<I>` – the underlying iterator type
-    ///
     /// `&self` – the formal `Arg` we are looking for
     ///
-    /// `arg` – the actual argument we are are attempting to parse
-    ///
-    /// `rest` – the iterator from which to extract additional raw arguments
-    ///
-    /// Note that `arg` should not include the leading hyphen (`'-'`), but should include the
-    /// second hyphen if it’s a long argument.
+    /// `param` – the parameter supplied to the option, if any.
     ///
     /// # Result
     ///
@@ -190,53 +185,8 @@ impl<'a, T> Arg<'a, T> {
     /// succeeds and the argument is accepted, or `Err(e)` if the parsing fails. Additionally,
     /// the second component of the pair will point to any remaining parameters after this one
     /// was accepted. This is used when one-character flags are provided together, like `-abc`.
-    pub (crate) fn parse_optional<'b, I>(&self, arg: &'b str, args: &mut I)
-        -> Option<(Result<T>, &'b str)>
-        where I: Iterator<Item=String>
-    {
-        // This function needs to be rewritten/refactored.
-        if let Some((c, rest)) = split_first_str(arg) {
-            if c == '-' {
-                if rest == self.long {
-                    let result = if self.name.is_empty() {
-                        (self.action)("")
-                    } else if let Some(next) = args.next() {
-                        (self.action)(&next)
-                    } else {
-                        Err(Error::from_string("requires parameter"))
-                    };
-                    Some((result, ""))
-                } else if let Some(index) = rest.find('=') {
-                    if rest[0..index] == self.long {
-                        let param = &rest[index + 1..];
-                        Some(((self.action)(param), ""))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else if Some(c) == self.short {
-                let pair = if self.name.is_empty() {
-                    ((self.action)(""), rest)
-                } else if rest.is_empty() {
-                    if let Some(next) = args.next() {
-                        ((self.action)(&next), "")
-                    } else {
-                        (Err(Error::from_string("requires parameter")), "")
-                    }
-                } else {
-                    ((self.action)(rest), "")
-                };
-                Some(pair)
-            } else {
-                None
-            }
-        } else if self.name.is_empty() {
-            Some(((self.action)("-"), ""))
-        } else {
-            None
-        }.map(|(result, rest)| (result.map_err(|e| e.with_option(arg)), rest))
+    pub (crate) fn parse_argument<'b>(&self, param: &'b str) -> Result<T> {
+        (self.action)(param)
     }
 }
 

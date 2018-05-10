@@ -198,15 +198,16 @@ impl<'a, T> Config<'a, T> {
         Ok(())
     }
 
-    pub (crate) fn parse_positional(&self, arg: &str) -> Result<T> {
-        self.args.iter()
-            .flat_map(|each| each.parse_positional(arg))
-            .next()
-            .unwrap_or_else(|| Err(Error::from_string("unexpected positional argument")))
+    pub (crate) fn get_positional(&self) -> Option<&Arg<'a, T>> {
+        self.positional.as_ref()
     }
 
-    pub (crate) fn get_args(&self) -> &[Arg<'a, T>] {
-        &self.args
+    pub (crate) fn get_short(&self, c: char) -> Option<&Arg<'a, T>> {
+        self.short_map.get(&c).map(|i| &self.args[*i])
+    }
+
+    pub (crate) fn get_long(&self, s: &str) -> Option<&Arg<'a, T>> {
+        self.long_map.get(s).map(|i| &self.args[*i])
     }
 }
 

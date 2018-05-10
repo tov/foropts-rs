@@ -22,47 +22,82 @@ pub struct Iter<'a, 'b: 'a, I, T: 'a>
     positional: bool,
 }
 
+impl<'a, 'b, I, T> Iter<'a, 'b, I, T>
+    where I: IntoIterator<Item=String>
+{
+    fn parse_positional(&self, actual: &str) -> Result<T> {
+        let formal = self.config.get_positional()
+            .ok_or_else(|| Error::from_string("Positional arguments not accepted"))?;
+        formal.parse_argument(actual)
+    }
+}
+
 impl<'a, 'b, I, T> Iterator for Iter<'a, 'b, I, T>
     where I: IntoIterator<Item=String>
 {
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Result<T>> {
+        use self::ArgState::*;
+
         self.push_back.take().or_else(|| self.args.next()).and_then(|item| {
-            let mut arg = item.as_str();
+            let arg = item.as_str();
 
             if self.positional {
-                return Some(self.config.parse_positional(arg));
+                return Some(self.parse_positional(arg));
             }
 
-            if arg == "--" {
-                self.positional = true;
-                return self.args.next().map(|arg| self.config.parse_positional(&arg));
-            }
-
-            let result = match arg.chars().next() {
-                Some('-') => {
-                    arg = &arg[1..];
-
-                    for each in self.config.get_args() {
-                        if let Some((result, rest)) = each.parse_optional(arg, &mut self.args) {
-                            if !rest.is_empty() {
-                                self.push_back = Some(format!("-{}", rest));
-                            }
-
-                            return Some(result);
-                        }
-                    }
-
-                    Err(Error::from_string("unrecognized").with_option(arg))
+            match analyze_argument(arg) {
+                EndOfOptions          => {
+                    self.positional = true;
+                    self.args.next().as_ref().map(|s| self.parse_positional(s))
                 }
 
-                Some(_)   => self.config.parse_positional(arg),
+                ShortOption(c, param) => {
+                    if let Some(arg) = self.config.get_short(c) {
+                        if arg.takes_parameter() {
+                            if !param.is_empty() {
+                                Some(arg.parse_argument(param))
+                            } else if let Some(param) = self.args.next() {
+                                Some(arg.parse_argument(&param))
+                            } else {
+                                Some(Err(arg.new_error(false, "expected option parameter")))
+                            }
+                        } else {
+                            if !param.is_empty() {
+                                self.push_back = Some(format!("-{}", param));
+                            }
+                            Some(arg.parse_argument(""))
+                        }
+                    } else {
+                        Some(Err(Error::from_string("unrecognized")
+                            .with_option(format!("-{}", c))))
+                    }
+                }
 
-                None      => self.config.parse_positional(""),
-            };
+                LongOption(s, param)  => {
+                    if let Some(arg) = self.config.get_long(s) {
+                        if arg.takes_parameter() {
+                            if let Some(param) = param {
+                                Some(arg.parse_argument(param))
+                            } else if let Some(param) = self.args.next() {
+                                Some(arg.parse_argument(&param))
+                            } else {
+                                Some(Err(arg.new_error(true, "expected option parameter")))
+                            }
+                        } else if param.is_none() {
+                            Some(arg.parse_argument(""))
+                        } else {
+                            Some(Err(arg.new_error(true, "unexpected option parameter")))
+                        }
+                    } else {
+                        Some(Err(Error::from_string("unrecognized")
+                            .with_option(format!("--{}", s))))
+                    }
+                }
 
-            Some(result)
+                Positional(s)         => Some(self.parse_positional(s)),
+            }.map(|o| o.map_err(|e| e.with_option(arg)))
         })
     }
 }
