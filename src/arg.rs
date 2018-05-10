@@ -162,7 +162,7 @@ impl<'a, T> Arg<'a, T> {
 
     pub (crate) fn positional_name(&self) -> &str {
         if self.name.is_empty() {
-            &"ARG"
+            "ARG"
         } else {
             &self.name
         }
