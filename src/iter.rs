@@ -1,3 +1,4 @@
+use util::*;
 use super::*;
 
 /// The iterator over the processed arguments.
@@ -78,5 +79,36 @@ impl<'a, 'b, I, T> Iter<'a, 'b, I, T>
             push_back:  None,
             positional: false,
         }
+    }
+}
+
+enum ParamState<'a> {
+    EndOfOptions,
+    ShortOption(char, &'a str),
+    LongOption(&'a str, Option<&'a str>),
+    Positional(&'a str),
+}
+
+fn analyze_parameter(param: &str) -> ParamState {
+    match split_first_str(param) {
+        Some(('-', rest)) => analyze_option(rest),
+        _ => ParamState::Positional(param)
+    }
+}
+
+fn analyze_option(opt: &str) -> ParamState {
+    use self::ParamState::*;
+
+    match split_first_str(opt) {
+        None              => Positional("-"),
+        Some(('-', ""))   => EndOfOptions,
+        Some(('-', rest)) => {
+            if let Some(ix) = rest.find('=') {
+                LongOption(&rest[..ix], Some(&rest[ix + 1 ..]))
+            } else {
+                LongOption(rest, None)
+            }
+        }
+        Some((c, rest))   => ShortOption(c, rest),
     }
 }

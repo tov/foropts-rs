@@ -198,6 +198,7 @@ impl<'a, T> Arg<'a, T> {
         -> Option<(Result<T>, &'b str)>
         where I: Iterator<Item=String>
     {
+        // This function needs to be rewritten/refactored.
         if let Some((c, rest)) = split_first_str(arg) {
             if c == '-' {
                 if rest == self.long {
