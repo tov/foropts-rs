@@ -132,6 +132,22 @@ impl<'a, T> Arg<'a, T> {
         writeln!(out)
     }
 
+    pub (crate) fn is_positional(&self) -> bool {
+        self.short.is_none() && self.long.is_empty()
+    }
+
+    pub (crate) fn get_short(&self) -> Option<char> {
+        self.short
+    }
+
+    pub (crate) fn get_long(&self) -> Option<&str> {
+        if self.long.is_empty() {
+            None
+        } else {
+            Some(&self.long)
+        }
+    }
+
     pub (crate) fn positional_name(&self) -> Option<&str> {
         if self.short.is_none() && self.long.is_empty() {
             if self.name.is_empty() {
@@ -140,26 +156,6 @@ impl<'a, T> Arg<'a, T> {
                 Some(&self.name)
             }
         } else {None}
-    }
-
-    /// Checks that this `Arg` and another `Arg` don't claim the same option names.
-    pub (crate) fn check_interference<'b, U>(&self, other: &Arg<'b, U>) -> Result<()> {
-        if let (Some(c1), Some(c2)) = (self.short, other.short) {
-            if c1 == c2 {
-                return Err(Error::from_string("repeated in config")
-                               .with_option(format!("-{}", c1)))
-            }
-        }
-
-        let longs = (non_empty_string(&self.long), non_empty_string(&other.long));
-        if let (Some(s1), Some(s2)) = longs {
-            if s1 == s2 {
-                return Err(Error::from_string("repeated in config")
-                    .with_option(format!("--{}", s1)))
-            }
-        }
-
-        Ok(())
     }
 
     /// Parses a position parameter, provided the given `Arg` accepts one.

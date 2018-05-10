@@ -1,5 +1,6 @@
 use super::*;
 
+use std::collections::hash_map::{self, HashMap};
 use std::io;
 use std::process::exit;
 
@@ -17,17 +18,23 @@ pub struct Config<'a, T> {
     author:     Option<String>,
     about:      Option<String>,
     args:       Vec<Arg<'a, T>>,
+    short_map:  HashMap<char, usize>,
+    long_map:   HashMap<String, usize>,
+    positional: Option<Arg<'a, T>>,
 }
 
 impl<'a, T> Config<'a, T> {
     /// Creates a new `foropts::Builder` given the name of the program.
     pub fn new<S: Into<String>>(name: S) -> Self {
         Config {
-            name:    name.into(),
-            version: None,
-            author:  None,
-            about:   None,
-            args:    Vec::new(),
+            name:       name.into(),
+            version:    None,
+            author:     None,
+            about:      None,
+            args:       Vec::new(),
+            short_map:  HashMap::new(),
+            long_map:   HashMap::new(),
+            positional: None,
         }
     }
 
@@ -58,8 +65,41 @@ impl<'a, T> Config<'a, T> {
     /// Adds an argument to the list of arguments, returning `Result::Err` if the
     /// argument cannot be added.
     pub fn arg_safe(&mut self, arg: Arg<'a, T>) -> Result<()> {
-        for each in &self.args {
-            each.check_interference(&arg)?;
+        use self::hash_map::Entry::*;
+
+        if arg.is_positional() {
+            if self.positional.is_none () {
+                self.positional = Some(arg);
+                return Ok(());
+            } else {
+                return Err(Error::from_string("multiple positional arguments"))
+            }
+        }
+
+        let index = self.args.len();
+
+        if let Some(c) = arg.get_short() {
+            match self.short_map.entry(c) {
+                Vacant(entry) => {
+                    entry.insert(index);
+                }
+                Occupied(_)   => {
+                    return Err(Error::from_string("repeated in config")
+                        .with_option(format!("-{}", c)));
+                }
+            }
+        }
+
+        if let Some(s) = arg.get_long() {
+            match self.long_map.entry(s.to_owned()) {
+                Vacant(entry) => {
+                    entry.insert(index);
+                }
+                Occupied(_)   => {
+                    return Err(Error::from_string("repeated in config")
+                        .with_option(format!("--{}", s)));
+                }
+            }
         }
 
         self.args.push(arg);

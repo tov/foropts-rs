@@ -82,22 +82,22 @@ impl<'a, 'b, I, T> Iter<'a, 'b, I, T>
     }
 }
 
-enum ParamState<'a> {
+enum ArgState<'a> {
     EndOfOptions,
     ShortOption(char, &'a str),
     LongOption(&'a str, Option<&'a str>),
     Positional(&'a str),
 }
 
-fn analyze_parameter(param: &str) -> ParamState {
+fn analyze_argument(param: &str) -> ArgState {
     match split_first_str(param) {
         Some(('-', rest)) => analyze_option(rest),
-        _ => ParamState::Positional(param)
+        _ => ArgState::Positional(param)
     }
 }
 
-fn analyze_option(opt: &str) -> ParamState {
-    use self::ParamState::*;
+fn analyze_option(opt: &str) -> ArgState {
+    use self::ArgState::*;
 
     match split_first_str(opt) {
         None              => Positional("-"),
