@@ -160,14 +160,12 @@ impl<'a, T> Arg<'a, T> {
         non_empty_string(&self.long)
     }
 
-    pub (crate) fn positional_name(&self) -> Option<&str> {
-        if self.is_positional() {
-            if self.name.is_empty() {
-                Some(&"ARG")
-            } else {
-                Some(&self.name)
-            }
-        } else {None}
+    pub (crate) fn positional_name(&self) -> &str {
+        if self.name.is_empty() {
+            &"ARG"
+        } else {
+            &self.name
+        }
     }
 
     /// Attempts to parse an argument.

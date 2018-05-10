@@ -169,13 +169,11 @@ impl<'a, T> Config<'a, T> {
     fn write_usage_line<W: io::Write>(&self, mut out: W) -> io::Result<()> {
         write!(out, "Usage: {} OPTION...", self.name)?;
 
-        for arg in &self.args {
-            if let Some(name) = arg.positional_name() {
-                return writeln!(out, " [--] {}...", name);
-            }
+        if let Some(ref arg) = self.positional {
+            writeln!(out, " [--] {}...", arg.positional_name())
+        } else {
+            writeln!(out)
         }
-
-        writeln!(out)
     }
 
     /// Writes usage information to the given `Write`.
