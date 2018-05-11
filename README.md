@@ -6,7 +6,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE-APACHE)
 
 Most argument parsing libraries, such as
-[`clap`](https://crates.io/crates/clap) treat the arguments as a
+[`clap`](https://crates.io/crates/clap), treat the arguments as a
 multimap; `foropts` treats the arguments as a sequence. This usually
 isn’t what you want, but occasionally it is.
 
