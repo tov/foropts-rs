@@ -21,6 +21,8 @@
 //!
 //! to your crate root.
 //!
+//! This crate supports Rust version 1.22 and later.
+//!
 //! # Example
 //!
 //! In this example, we accept one boolean flag, `-v` (or `--verbose`), and two
