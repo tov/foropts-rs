@@ -1,4 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/foropts/0.3.4-pre")]
 //! An argument-parsing iterator.
 //!
 //! Most argument parsing libraries, such as
