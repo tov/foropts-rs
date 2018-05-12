@@ -15,6 +15,7 @@ isn’t what you want, but occasionally it is.
 It's on [crates.io](https://crates.io/crates/foropts), so you can add
 
 ```toml
+[dependencies]
 foropts = "0.3"
 ```
 
