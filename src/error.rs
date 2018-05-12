@@ -19,6 +19,7 @@ impl Error {
 
     /// Sets the particular option that triggered the error.
     pub fn with_option<S: Into<String>>(mut self, option: S) -> Self {
+        // "The string is a stark data structure." —Alan Perlis
         if !self.message.starts_with("option -") {
             self.message = format!("option {}: {}", option.into(), self.message);
         }
