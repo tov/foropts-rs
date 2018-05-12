@@ -4,7 +4,7 @@ use std::{fmt, result};
 pub type Result<T> = result::Result<T, Error>;
 
 /// The error type for argument parser.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Error {
     message:    String,
 }
