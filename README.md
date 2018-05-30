@@ -16,7 +16,7 @@ It's on [crates.io](https://crates.io/crates/foropts), so you can add
 
 ```toml
 [dependencies]
-foropts = "0.3"
+foropts = "0.3.6"
 ```
 
 to your `Cargo.toml` and

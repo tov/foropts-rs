@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/foropts/0.3.4")]
+#![doc(html_root_url = "https://docs.rs/foropts/0.3.6")]
 //! An argument-parsing iterator.
 //!
 //! Most argument parsing libraries, such as
@@ -12,7 +12,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! foropts = "0.3"
+//! foropts = "0.3.6"
 //! ```
 //!
 //! to your `Cargo.toml` and
