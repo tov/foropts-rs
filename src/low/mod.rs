@@ -44,10 +44,27 @@ mod tests {
     }
 
     #[test]
-    fn borrowed() {
+    fn borrowed_short() {
         assert_parse( &["-a", "-ofile"],
                       &[ Item::Opt(Flag::Short('a'), None),
                          Item::Opt(Flag::Short('o'), Some("file")) ] );
+        assert_parse( &["-aofile"],
+                      &[ Item::Opt(Flag::Short('a'), None),
+                         Item::Opt(Flag::Short('o'), Some("file")) ] );
+        assert_parse( &["-oafile"],
+                      &[ Item::Opt(Flag::Short('o'), Some("afile")) ] );
+        assert_parse( &["-o", "afile"],
+                      &[ Item::Opt(Flag::Short('o'), Some("afile")) ] );
+        assert_parse( &["-o", "a", "file"],
+                      &[ Item::Opt(Flag::Short('o'), Some("a")),
+                         Item::Positional("file") ] );
+        assert_parse( &["-eieio"],
+                      &[ Item::Error(ErrorKind::UnknownFlag(Flag::Short('e'))),
+                         Item::Error(ErrorKind::UnknownFlag(Flag::Short('i'))),
+                         Item::Error(ErrorKind::UnknownFlag(Flag::Short('e'))),
+                         Item::Error(ErrorKind::UnknownFlag(Flag::Short('i'))),
+                         Item::Error(ErrorKind::MissingParam(Flag::Short('o'))),
+                       ] );
     }
 
     fn assert_parse(input: &[&str], output: &[Item]) {
