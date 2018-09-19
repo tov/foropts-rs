@@ -108,25 +108,6 @@ impl<L> HashConfig<L>
 
 }
 
-//impl HashConfig<String> {
-//    pub fn long<S, P>(mut self, flag: S, param: P) -> Self
-//        where S: Into<String>,
-//              P: Into<Presence> {
-//
-//        self.long_opts.insert(flag.into(), param.into());
-//        self
-//    }
-//}
-//
-//impl<'a> HashConfig<&'a str> {
-//    pub fn long<P>(mut self, flag: &'a str, param: P) -> Self
-//        where P: Into<Presence> {
-//
-//        self.long_opts.insert(flag, param.into());
-//        self
-//    }
-//}
-
 #[derive(Clone, Copy, Debug)]
 pub struct SliceConfig<'a> {
     pub short_options: &'a [char],
