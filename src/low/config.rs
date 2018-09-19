@@ -5,10 +5,23 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-pub trait Config {
-    fn short_takes_param(&self, short: char) -> Option<bool>;
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Presence {
+    Always,
+    IfAttached,
+    Never,
+}
 
-    fn long_takes_param(&self, long: &str) -> Option<bool>;
+impl From<bool> for Presence {
+    fn from(b: bool) -> Self {
+        if b { Presence::Always } else { Presence::Never }
+    }
+}
+
+pub trait Config {
+    fn get_short_param(&self, short: char) -> Option<Presence>;
+
+    fn get_long_param(&self, long: &str) -> Option<Presence>;
 
     fn parse_slice<'a, Arg>(self, args: &'a [Arg]) -> Iter<'a, Self, Arg>
         where Self: Sized,
@@ -19,12 +32,12 @@ pub trait Config {
 }
 
 impl<'a, T: Config> Config for &'a T {
-    fn short_takes_param(&self, short: char) -> Option<bool> {
-        T::short_takes_param(self, short)
+    fn get_short_param(&self, short: char) -> Option<Presence> {
+        T::get_short_param(self, short)
     }
 
-    fn long_takes_param(&self, long: &str) -> Option<bool> {
-        T::long_takes_param(self, long)
+    fn get_long_param(&self, long: &str) -> Option<Presence> {
+        T::get_long_param(self, long)
     }
 }
 
@@ -33,18 +46,18 @@ impl<'a, T: Config> Config for &'a T {
 pub struct HashConfig<L>
     where L: Eq + Hash + Borrow<str> {
 
-    short_opts: HashMap<char, bool>,
-    long_opts:  HashMap<L, bool>,
+    short_opts: HashMap<char, Presence>,
+    long_opts:  HashMap<L, Presence>,
 }
 
 impl<L> Config for HashConfig<L>
     where L: Eq + Hash + Borrow<str> {
 
-    fn short_takes_param(&self, short: char) -> Option<bool> {
+    fn get_short_param(&self, short: char) -> Option<Presence> {
         self.short_opts.get(&short).cloned()
     }
 
-    fn long_takes_param(&self, long: &str) -> Option<bool> {
+    fn get_long_param(&self, long: &str) -> Option<Presence> {
         self.long_opts.get(long).cloned()
     }
 }
@@ -62,18 +75,57 @@ impl<L> HashConfig<L>
     pub fn with_capacities(shorts: usize, longs: usize) -> Self {
         HashConfig {
             short_opts: HashMap::with_capacity(shorts),
-            long_opts: HashMap::with_capacity(longs),
+            long_opts:  HashMap::with_capacity(longs),
         }
     }
 
-    pub fn opt<F: Into<Flag<L>>>(mut self, flag: F, takes_param: bool) -> Self {
+    pub fn opt<F, P>(mut self, flag: F, param: P) -> Self
+    where F: Into<Flag<L>>,
+          P: Into<Presence> {
+
         match flag.into() {
-            Flag::Short(short) => { self.short_opts.insert(short, takes_param); }
-            Flag::Long(long)   => { self.long_opts.insert(long, takes_param); }
+            Flag::Short(short) => { self.short_opts.insert(short, param.into()); }
+            Flag::Long(long)   => { self.long_opts.insert(long, param.into()); }
         }
+
         self
     }
+
+    pub fn short<P>(mut self, flag: char, param: P) -> Self
+        where P: Into<Presence> {
+
+        self.short_opts.insert(flag, param.into());
+        self
+    }
+
+    pub fn long<S, P>(mut self, flag: S, param: P) -> Self
+        where L: From<S>,
+              P: Into<Presence> {
+
+        self.long_opts.insert(L::from(flag), param.into());
+        self
+    }
+
 }
+
+//impl HashConfig<String> {
+//    pub fn long<S, P>(mut self, flag: S, param: P) -> Self
+//        where S: Into<String>,
+//              P: Into<Presence> {
+//
+//        self.long_opts.insert(flag.into(), param.into());
+//        self
+//    }
+//}
+//
+//impl<'a> HashConfig<&'a str> {
+//    pub fn long<P>(mut self, flag: &'a str, param: P) -> Self
+//        where P: Into<Presence> {
+//
+//        self.long_opts.insert(flag, param.into());
+//        self
+//    }
+//}
 
 #[derive(Clone, Copy, Debug)]
 pub struct SliceConfig<'a> {
@@ -84,21 +136,21 @@ pub struct SliceConfig<'a> {
 }
 
 impl<'a> Config for SliceConfig<'a> {
-    fn short_takes_param(&self, short: char) -> Option<bool> {
+    fn get_short_param(&self, short: char) -> Option<Presence> {
         if self.short_options.contains(&short) {
-            Some(true)
+            Some(Presence::Never)
         } else if self.short_flags.contains(&short) {
-            Some(false)
+            Some(Presence::Always)
         } else {
             None
         }
     }
 
-    fn long_takes_param(&self, long: &str) -> Option<bool> {
+    fn get_long_param(&self, long: &str) -> Option<Presence> {
         if self.long_options.contains(&long) {
-            Some(true)
+            Some(Presence::Never)
         } else if self.long_flags.contains(&long) {
-            Some(false)
+            Some(Presence::Always)
         } else {
             None
         }

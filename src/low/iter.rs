@@ -1,6 +1,7 @@
 use super::super::util::split_first_str;
-use super::config::Config;
+use super::config::{Config, Presence};
 use super::flag::Flag;
+use self::Presence::*;
 
 use std::borrow::Borrow;
 use std::mem::replace;
@@ -17,7 +18,7 @@ pub struct Iter<'a, Cfg, Arg>
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Item<'a> {
-    Flag(Flag<&'a str>, Option<&'a str>),
+    Opt(Flag<&'a str>, Option<&'a str>),
     Positional(&'a str),
     Error(ErrorKind<'a>),
 }
@@ -58,20 +59,22 @@ impl<'a, Cfg, Arg> Iter<'a, Cfg, Arg>
             let long  = &after_hyphens[.. index];
             let param = &after_hyphens[index + 1 ..];
             let flag  = Flag::Long(long);
-            match self.config.long_takes_param(long) {
-                None        => Item::Error(ErrorKind::UnknownFlag(flag)),
-                Some(false) => Item::Error(ErrorKind::UnexpectedParam(flag)),
-                Some(true)  => Item::Flag(flag, Some(param)),
+            match self.config.get_long_param(long) {
+                None            => Item::Error(ErrorKind::UnknownFlag(flag)),
+                Some(Never)     => Item::Error(ErrorKind::UnexpectedParam(flag)),
+                Some(IfAttached) => Item::Opt(flag, Some(param)),
+                Some(Always)    => Item::Opt(flag, Some(param)),
             }
         } else {
             let long = after_hyphens;
             let flag = Flag::Long(long);
-            match self.config.long_takes_param(long) {
-                None        => Item::Error(ErrorKind::UnknownFlag(flag)),
-                Some(false) => Item::Flag(flag, None),
-                Some(true)  => match self.next_arg() {
-                    None        => Item::Error(ErrorKind::MissingParam(flag)),
-                    Some(param) => Item::Flag(flag, Some(param)),
+            match self.config.get_long_param(long) {
+                None            => Item::Error(ErrorKind::UnknownFlag(flag)),
+                Some(Never)     => Item::Opt(flag, None),
+                Some(IfAttached) => Item::Opt(flag, None),
+                Some(Always)    => match self.next_arg() {
+                    None           => Item::Error(ErrorKind::MissingParam(flag)),
+                    Some(param)    => Item::Opt(flag, Some(param)),
                 },
             }
         }
@@ -80,12 +83,12 @@ impl<'a, Cfg, Arg> Iter<'a, Cfg, Arg>
     fn parse_short(&mut self, c: char, rest: &'a str) -> Item<'a> {
         let flag = Flag::Short(c);
 
-        match self.config.short_takes_param(c) {
+        match self.config.get_short_param(c) {
             None => {
                 self.state = State::ShortOpts(rest);
                 Item::Error(ErrorKind::UnknownFlag(flag))
             },
-            Some(true) => if rest.is_empty() {
+            Some(Always) => if rest.is_empty() {
                 match self.next_arg() {
                     None      => {
                         // self.state was set to State::Finished by next_arg.
@@ -93,16 +96,22 @@ impl<'a, Cfg, Arg> Iter<'a, Cfg, Arg>
                     },
                     Some(arg) => {
                         self.state = State::Start;
-                        Item::Flag(flag, Some(arg))
+                        Item::Opt(flag, Some(arg))
                     },
                 }
             } else {
                 self.state = State::Start;
-                Item::Flag(flag, Some(rest))
+                Item::Opt(flag, Some(rest))
             },
-            Some(false) => {
+            Some(IfAttached) => if rest.is_empty() {
+                Item::Opt(flag, None)
+            } else {
+                self.state = State::Start;
+                Item::Opt(flag, Some(rest))
+            },
+            Some(Never) => {
                 self.state = State::ShortOpts(rest);
-                Item::Flag(flag, None)
+                Item::Opt(flag, None)
             }
         }
     }
