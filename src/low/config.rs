@@ -1,4 +1,7 @@
+use super::iter::Iter;
+
 use std::collections::HashMap;
+use std::ops::Deref;
 
 //pub trait LongOption: Eq + Hash + Deref<Target=str> { }
 //
@@ -37,6 +40,13 @@ impl Config {
     pub fn long_option<S: Into<String>>(mut self, flag: S) -> Self {
         self.long_options.insert(flag.into(), true);
         self
+    }
+
+    pub fn parse_slice<'a, 'b, Arg>(&'a self, args: &'b [Arg])
+        -> Iter<'a, 'b, Arg>
+        where Arg: Deref<Target=str> + 'b {
+
+        Iter::new(self, args)
     }
 }
 

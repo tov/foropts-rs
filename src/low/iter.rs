@@ -41,6 +41,14 @@ enum State<'b> {
 }
 
 impl<'a, 'b, Arg> Iter<'a, 'b, Arg> where Arg: Deref<Target=str> + 'b {
+    pub fn new(config: &'a Config, args: &'b [Arg]) -> Self {
+        Iter {
+            config,
+            state:  State::Start,
+            args,
+        }
+    }
+
     fn parse_long(&mut self, after_hyphens: &'b str) -> Item<'b> {
         if let Some(index) = after_hyphens.find('=') {
             let long  = &after_hyphens[.. index];
