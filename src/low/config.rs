@@ -1,52 +1,106 @@
 use super::iter::Iter;
+use super::flag::Flag;
 
+use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::ops::Deref;
+use std::hash::Hash;
 
-//pub trait LongOption: Eq + Hash + Deref<Target=str> { }
-//
-//impl<T: Eq + Hash + Deref<Target=str>> LongOption for T { }
+pub trait Config {
+    fn short_takes_param(&self, short: char) -> Option<bool>;
 
-/// The configuration for the argument parser.
-#[derive(Clone, Debug)]
-pub struct Config {
-    pub (crate) short_options: HashMap<char, bool>,
-    pub (crate) long_options:  HashMap<String, bool>,
-}
+    fn long_takes_param(&self, long: &str) -> Option<bool>;
 
-impl Config {
-    pub fn new() -> Self {
-        Config {
-            short_options: HashMap::new(),
-            long_options:  HashMap::new(),
-        }
-    }
-
-    pub fn short_flag(mut self, flag: char) -> Self {
-        self.short_options.insert(flag, false);
-        self
-    }
-
-    pub fn short_option(mut self, flag: char) -> Self {
-        self.short_options.insert(flag, true);
-        self
-    }
-
-    pub fn long_flag<S: Into<String>>(mut self, flag: S) -> Self {
-        self.long_options.insert(flag.into(), false);
-        self
-    }
-
-    pub fn long_option<S: Into<String>>(mut self, flag: S) -> Self {
-        self.long_options.insert(flag.into(), true);
-        self
-    }
-
-    pub fn parse_slice<'a, 'b, Arg>(&'a self, args: &'b [Arg])
-        -> Iter<'a, 'b, Arg>
-        where Arg: Deref<Target=str> + 'b {
+    fn parse_slice<'a, Arg>(self, args: &'a [Arg]) -> Iter<'a, Self, Arg>
+        where Self: Sized,
+              Arg:  Borrow<str> + 'a {
 
         Iter::new(self, args)
     }
 }
 
+impl<'a, T: Config> Config for &'a T {
+    fn short_takes_param(&self, short: char) -> Option<bool> {
+        T::short_takes_param(self, short)
+    }
+
+    fn long_takes_param(&self, long: &str) -> Option<bool> {
+        T::long_takes_param(self, long)
+    }
+}
+
+/// The configuration for the argument parser.
+#[derive(Clone, Debug)]
+pub struct HashConfig<L>
+    where L: Eq + Hash + Borrow<str> {
+
+    short_opts: HashMap<char, bool>,
+    long_opts:  HashMap<L, bool>,
+}
+
+impl<L> Config for HashConfig<L>
+    where L: Eq + Hash + Borrow<str> {
+
+    fn short_takes_param(&self, short: char) -> Option<bool> {
+        self.short_opts.get(&short).cloned()
+    }
+
+    fn long_takes_param(&self, long: &str) -> Option<bool> {
+        self.long_opts.get(long).cloned()
+    }
+}
+
+impl<L> HashConfig<L>
+    where L: Eq + Hash + Borrow<str> {
+
+    pub fn new() -> Self {
+        HashConfig {
+            short_opts: HashMap::new(),
+            long_opts:  HashMap::new(),
+        }
+    }
+
+    pub fn with_capacities(shorts: usize, longs: usize) -> Self {
+        HashConfig {
+            short_opts: HashMap::with_capacity(shorts),
+            long_opts: HashMap::with_capacity(longs),
+        }
+    }
+
+    pub fn opt<F: Into<Flag<L>>>(mut self, flag: F, takes_param: bool) -> Self {
+        match flag.into() {
+            Flag::Short(short) => { self.short_opts.insert(short, takes_param); }
+            Flag::Long(long)   => { self.long_opts.insert(long, takes_param); }
+        }
+        self
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct SliceConfig<'a> {
+    pub short_options: &'a [char],
+    pub short_flags:   &'a [char],
+    pub long_options:  &'a [&'a str],
+    pub long_flags:    &'a [&'a str],
+}
+
+impl<'a> Config for SliceConfig<'a> {
+    fn short_takes_param(&self, short: char) -> Option<bool> {
+        if self.short_options.contains(&short) {
+            Some(true)
+        } else if self.short_flags.contains(&short) {
+            Some(false)
+        } else {
+            None
+        }
+    }
+
+    fn long_takes_param(&self, long: &str) -> Option<bool> {
+        if self.long_options.contains(&long) {
+            Some(true)
+        } else if self.long_flags.contains(&long) {
+            Some(false)
+        } else {
+            None
+        }
+    }
+}

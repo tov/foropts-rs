@@ -1,47 +1,47 @@
-use ::util::split_first_str;
+use super::super::util::split_first_str;
 use super::config::Config;
+use super::flag::Flag;
 
-use std::ops::Deref;
+use std::borrow::Borrow;
+use std::mem::replace;
 
 #[derive(Clone, Debug)]
-pub struct Iter<'a, 'b, Arg>
-    where Arg: Deref<Target=str> + 'b {
+pub struct Iter<'a, Cfg, Arg>
+    where Cfg: Config,
+          Arg: Borrow<str> + 'a {
 
-    config:     &'a Config,
-    state:      State<'b>,
-    args:       &'b [Arg],
+    config:     Cfg,
+    state:      State<'a>,
+    args:       &'a [Arg],
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum Item<'b> {
-    Flag(Flag<'b>, Option<&'b str>),
-    Positional(&'b str),
-    Error(ErrorKind<'b>),
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Item<'a> {
+    Flag(Flag<&'a str>, Option<&'a str>),
+    Positional(&'a str),
+    Error(ErrorKind<'a>),
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum Flag<'b> {
-    Short(char),
-    Long(&'b str),
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum ErrorKind<'b> {
-    UnknownFlag(Flag<'b>),
-    MissingParam(Flag<'b>),
-    UnexpectedParam(Flag<'b>),
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ErrorKind<'a> {
+    UnknownFlag(Flag<&'a str>),
+    MissingParam(Flag<&'a str>),
+    UnexpectedParam(Flag<&'a str>),
 }
 
 #[derive(Clone, Debug)]
-enum State<'b> {
+enum State<'a> {
     Start,
-    ShortOpts(&'b str),
+    ShortOpts(&'a str),
     PositionalOnly,
     Finished,
 }
 
-impl<'a, 'b, Arg> Iter<'a, 'b, Arg> where Arg: Deref<Target=str> + 'b {
-    pub fn new(config: &'a Config, args: &'b [Arg]) -> Self {
+impl<'a, Cfg, Arg> Iter<'a, Cfg, Arg>
+    where Cfg: Config,
+          Arg: Borrow<str> + 'a {
+
+    pub fn new(config: Cfg, args: &'a [Arg]) -> Self {
         Iter {
             config,
             state:  State::Start,
@@ -49,12 +49,16 @@ impl<'a, 'b, Arg> Iter<'a, 'b, Arg> where Arg: Deref<Target=str> + 'b {
         }
     }
 
-    fn parse_long(&mut self, after_hyphens: &'b str) -> Item<'b> {
+    pub fn set_config(&mut self, config: Cfg) -> Cfg {
+        replace(&mut self.config, config)
+    }
+
+    fn parse_long(&mut self, after_hyphens: &'a str) -> Item<'a> {
         if let Some(index) = after_hyphens.find('=') {
             let long  = &after_hyphens[.. index];
             let param = &after_hyphens[index + 1 ..];
             let flag  = Flag::Long(long);
-            match self.long_takes_param(long) {
+            match self.config.long_takes_param(long) {
                 None        => Item::Error(ErrorKind::UnknownFlag(flag)),
                 Some(false) => Item::Error(ErrorKind::UnexpectedParam(flag)),
                 Some(true)  => Item::Flag(flag, Some(param)),
@@ -62,7 +66,7 @@ impl<'a, 'b, Arg> Iter<'a, 'b, Arg> where Arg: Deref<Target=str> + 'b {
         } else {
             let long = after_hyphens;
             let flag = Flag::Long(long);
-            match self.long_takes_param(long) {
+            match self.config.long_takes_param(long) {
                 None        => Item::Error(ErrorKind::UnknownFlag(flag)),
                 Some(false) => Item::Flag(flag, None),
                 Some(true)  => match self.next_arg() {
@@ -73,10 +77,10 @@ impl<'a, 'b, Arg> Iter<'a, 'b, Arg> where Arg: Deref<Target=str> + 'b {
         }
     }
 
-    fn parse_short(&mut self, c: char, rest: &'b str) -> Item<'b> {
+    fn parse_short(&mut self, c: char, rest: &'a str) -> Item<'a> {
         let flag = Flag::Short(c);
 
-        match self.short_takes_param(c) {
+        match self.config.short_takes_param(c) {
             None => {
                 self.state = State::ShortOpts(rest);
                 Item::Error(ErrorKind::UnknownFlag(flag))
@@ -103,31 +107,24 @@ impl<'a, 'b, Arg> Iter<'a, 'b, Arg> where Arg: Deref<Target=str> + 'b {
         }
     }
 
-    fn next_arg(&mut self) -> Option<&'b str> {
+    fn next_arg(&mut self) -> Option<&'a str> {
         if let Some(arg) = self.args.get(0) {
             self.args = &self.args[1 ..];
-            Some(arg)
+            Some(arg.borrow())
         } else {
             self.state = State::Finished;
             None
         }
     }
-
-    fn long_takes_param(&self, name: &str) -> Option<bool> {
-        self.config.long_options.get(name).cloned()
-    }
-
-    fn short_takes_param(&self, name: char) -> Option<bool> {
-        self.config.short_options.get(&name).cloned()
-    }
 }
 
-impl<'a, 'b, Arg> Iterator for Iter<'a, 'b, Arg>
-    where Arg: Deref<Target=str> + 'b {
+impl<'a, Cfg, Arg> Iterator for Iter<'a, Cfg, Arg>
+    where Cfg: Config,
+          Arg: Borrow<str> + 'a {
 
-    type Item = Item<'b>;
+    type Item = Item<'a>;
 
-    fn next(&mut self) -> Option<Item<'b>> {
+    fn next(&mut self) -> Option<Item<'a>> {
         loop {
             match self.state {
                 State::Start => {
