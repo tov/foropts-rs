@@ -135,34 +135,6 @@ impl<T: Config, U: Config> Config for (T, U) {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct SliceConfig<'a> {
-    pub short_options: &'a [char],
-    pub short_flags:   &'a [char],
-    pub long_options:  &'a [&'a str],
-    pub long_flags:    &'a [&'a str],
-}
-
-impl<'a> Config for SliceConfig<'a> {
-    fn get_short_param(&self, short: char) -> Option<Presence> {
-        match (self.short_options.contains(&short), self.short_flags.contains(&short)) {
-            (true,  false) => Some(Presence::Always),
-            (false, true)  => Some(Presence::Never),
-            (true,  true)  => Some(Presence::IfAttached),
-            (false, false) => None,
-        }
-    }
-
-    fn get_long_param(&self, long: &str) -> Option<Presence> {
-        match (self.long_options.contains(&long), self.long_flags.contains(&long)) {
-            (true,  false) => Some(Presence::Always),
-            (false, true)  => Some(Presence::Never),
-            (true,  true)  => Some(Presence::IfAttached),
-            (false, false) => None,
-        }
-    }
-}
-
 impl<L, P> Config for [(Flag<L>, P)]
     where L: Borrow<str>,
           P: Copy + Into<Presence> {
@@ -211,18 +183,6 @@ mod tests {
             .both('s', "strategy",  Always)
             .both('v', "verbose",   Never)
             .both('q', "quiet",     Never);
-
-        check_config(config);
-    }
-
-    #[test]
-    fn slice_config() {
-        let config = SliceConfig {
-            short_options:  &['m', 'r', 's'],
-            short_flags:    &['a', 'r', 'v', 'q'],
-            long_options:   &["log", "message", "rebase", "strategy"],
-            long_flags:     &["all", "log", "rebase", "verbose", "quiet"],
-        };
 
         check_config(config);
     }
