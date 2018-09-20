@@ -74,7 +74,7 @@ fn borrowed_long() {
     assert_parse( &["--out"],
                   &[ missing_param("out") ] );
     assert_parse( &["--all=none"],
-                  &[ unexpected_param("all", "none") ] );
+                  &[ unexpected_param("all", "none") ] )
 }
 
 

@@ -105,7 +105,24 @@ impl<L> HashConfig<L>
         self.long_opts.insert(L::from(flag), param.into());
         self
     }
+}
 
+#[derive(Clone, Copy, Debug)]
+pub struct LayerConfig<T, U> {
+    pub first:  T,
+    pub second: U,
+}
+
+impl<T: Config, U: Config> Config for LayerConfig<T, U> {
+    fn get_short_param(&self, short: char) -> Option<Presence> {
+        self.first.get_short_param(short).or_else(||
+            self.second.get_short_param(short))
+    }
+
+    fn get_long_param(&self, long: &str) -> Option<Presence> {
+        self.first.get_long_param(long).or_else(||
+            self.second.get_long_param(long))
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
