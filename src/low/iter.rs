@@ -110,11 +110,13 @@ impl<'a, Cfg, Arg> Iter<'a, Cfg, Arg>
                 self.state = State::Start;
                 Item::Opt(flag, Some(rest))
             },
-            Some(IfAttached) => if rest.is_empty() {
-                Item::Opt(flag, None)
-            } else {
+            Some(IfAttached) => {
                 self.state = State::Start;
-                Item::Opt(flag, Some(rest))
+                if rest.is_empty() {
+                    Item::Opt(flag, None)
+                } else {
+                    Item::Opt(flag, Some(rest))
+                }
             },
             Some(Never) => {
                 self.state = State::ShortOpts(rest);

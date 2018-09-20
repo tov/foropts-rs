@@ -10,7 +10,7 @@ enum GitCmd<'a> {
     Pull(PullCmd<'a>),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct GlobalOpts {
     version: bool,
     help: bool,
@@ -162,7 +162,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                                     if flag.is("bare") {
                                         bare = true;
                                     } else {
-                                        Err(format!("unexpected argument: {}", item))?;
+                                        unreachable!("2");
                                     }
                                 },
 
@@ -209,7 +209,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                                     } else if flag.is('A') || flag.is("all") {
                                         command.all = true;
                                     } else {
-                                        unreachable!();
+                                        unreachable!("3");
                                     }
                                 }
 
@@ -242,7 +242,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                                     } else if flag.is('a') || flag.is("all") {
                                         command.all = true;
                                     } else {
-                                        unreachable!();
+                                        unreachable!("4");
                                     }
                                 }
 
@@ -294,7 +294,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                                             command.repo = param;
                                         }
                                     } else {
-                                        unreachable!();
+                                        unreachable!("5");
                                     }
                                 }
 
@@ -338,7 +338,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                                     } else if flag.is('r') || flag.is("rebase") {
                                         command.rebase = param;
                                     } else {
-                                        unreachable!();
+                                        unreachable!("6");
                                     }
                                 }
 
@@ -369,4 +369,215 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
     }
 
     Err("no command")?
+}
+
+macro_rules! err {
+    ( $fmt:expr $( , $arg:expr )* ) => {
+        Err(format!($fmt $( , $arg )* ))
+    };
+}
+
+#[test]
+fn no_command_tests() {
+    assert_eq!( git(&[]),
+                err!("no command") );
+    assert_eq!( git(&["--version"]),
+                err!("no command") );
+    assert_eq!( git(&["--version", "--help"]),
+                err!("no command") );
+    assert_eq!( git(&["-version"]),
+                err!("unknown flag: -v") );
+}
+
+
+const GLOBAL: GlobalOpts = GlobalOpts {
+    version: false,
+    help: false,
+};
+
+#[test]
+fn clone_tests() {
+    let ok     = |cmd| Ok(GitCmd::Clone(cmd));
+    let global = GLOBAL;
+
+    assert_eq!( git(&["clone"]),
+                err!("expected argument: repo") );
+    assert_eq!( git(&["clone", "REPO"]),
+                ok(CloneCmd {
+                    global, verbose: false, jobs: None, repo: "REPO", dir: None,
+                }) );
+    assert_eq!( git(&["--help", "clone", "REPO"]),
+                ok(CloneCmd {
+                    global: GlobalOpts { version: false, help: true, },
+                    verbose: false, jobs: None, repo: "REPO", dir: None,
+                }) );
+    assert_eq!( git(&["clone", "--help", "REPO"]),
+                err!("unknown flag: --help") );
+    assert_eq!( git(&["clone", "-v", "REPO"]),
+                ok(CloneCmd {
+                    global, verbose: true, jobs: None, repo: "REPO", dir: None,
+                }) );
+    assert_eq!( git(&["clone", "-v", "REPO", "-q"]),
+                ok(CloneCmd {
+                    global, verbose: false, jobs: None, repo: "REPO", dir: None,
+                }) );
+    assert_eq!( git(&["clone", "REPO", "--jobs", "4"]),
+                ok(CloneCmd {
+                    global, verbose: false, jobs: Some("4"), repo: "REPO", dir: None,
+                }) );
+    assert_eq!( git(&["clone", "REPO", "--jobs=4"]),
+                ok(CloneCmd {
+                    global, verbose: false, jobs: Some("4"), repo: "REPO", dir: None,
+                }) );
+    assert_eq!( git(&["clone", "REPO", "-j4"]),
+                ok(CloneCmd {
+                    global, verbose: false, jobs: Some("4"), repo: "REPO", dir: None,
+                }) );
+    assert_eq!( git(&["clone", "REPO", "-j", "4"]),
+                ok(CloneCmd {
+                    global, verbose: false, jobs: Some("4"), repo: "REPO", dir: None,
+                }) );
+    assert_eq!( git(&["clone", "REPO", "DIR", "-vqj", "4"]),
+                ok(CloneCmd {
+                    global, verbose: false, jobs: Some("4"), repo: "REPO", dir: Some("DIR"),
+                }) );
+    assert_eq!( git(&["clone", "REPO", "DIR", "EXTRA", "-vqj", "4"]),
+                err!("unexpected argument: EXTRA") );
+    assert_eq!( git(&["clone", "REPO", "DIR", "-vQj", "4"]),
+                err!("unknown flag: -Q") );
+}
+
+#[test]
+fn init_tests() {
+    let ok     = |cmd| Ok(GitCmd::Init(cmd));
+    let global = GLOBAL;
+
+    assert_eq!( git(&["init"]),
+                ok(InitCmd { global, dir: None, bare: false, }) );
+    assert_eq!( git(&["init", "--help"]),
+                err!("unknown flag: --help") );
+    assert_eq!( git(&["init", "somewhere"]),
+                ok(InitCmd { global, dir: Some("somewhere"), bare: false, }) );
+    assert_eq!( git(&["init", "--bare", "somewhere"]),
+                ok(InitCmd { global, dir: Some("somewhere"), bare: true, }) );
+    assert_eq!( git(&["init", "somewhere", "--bare"]),
+                ok(InitCmd { global, dir: Some("somewhere"), bare: true, }) );
+    assert_eq!( git(&["init", "somewhere", "else"]),
+                err!("unexpected argument: else") );
+}
+
+#[test]
+fn add_tests() {
+    let ok     = |cmd| Ok(GitCmd::Add(cmd));
+    let global = GLOBAL;
+
+    assert_eq!( git(&["add"]),
+                ok(AddCmd {
+                    global, dry_run: false, verbose: false,
+                    interactive: false, all: false, files: vec![],
+                }) );
+    assert_eq!( git(&["add", "--dry-run"]),
+                ok(AddCmd {
+                    global, dry_run: true, verbose: false,
+                    interactive: false, all: false, files: vec![],
+                }) );
+    assert_eq!( git(&["add", "-n"]),
+                ok(AddCmd {
+                    global, dry_run: true, verbose: false,
+                    interactive: false, all: false, files: vec![],
+                }) );
+    assert_eq!( git(&["add", "-n", "foo"]),
+                ok(AddCmd {
+                    global, dry_run: true, verbose: false,
+                    interactive: false, all: false, files: vec!["foo"],
+                }) );
+    assert_eq!( git(&["add", "-n", "foo", "bar"]),
+                ok(AddCmd {
+                    global, dry_run: true, verbose: false,
+                    interactive: false, all: false, files: vec!["foo", "bar"],
+                }) );
+    assert_eq!( git(&["add", "-n", "foo", "bar", "baz"]),
+                ok(AddCmd {
+                    global, dry_run: true, verbose: false,
+                    interactive: false, all: false, files: vec!["foo", "bar", "baz"],
+                }) );
+}
+
+#[test]
+fn push_tests() {
+    let ok     = |cmd| Ok(GitCmd::Push(cmd));
+    let global = GLOBAL;
+
+    assert_eq!( git(&["push"]),
+                ok(PushCmd {
+                    global, verbose: false, force: false, delete: false, all: false,
+                    repo: None, refspecs: vec![],
+                }) );
+    assert_eq!( git(&["push", "a_repo", "a_refspec"]),
+                ok(PushCmd {
+                    global, verbose: false, force: false, delete: false, all: false,
+                    repo: Some("a_repo"), refspecs: vec!["a_refspec"],
+                }) );
+    assert_eq!( git(&["push", "a_repo", "a_refspec", "another"]),
+                ok(PushCmd {
+                    global, verbose: false, force: false, delete: false, all: false,
+                    repo: Some("a_repo"), refspecs: vec!["a_refspec", "another"],
+                }) );
+}
+
+#[test]
+fn pull_tests() {
+    let ok     = |cmd| Ok(GitCmd::Pull(cmd));
+    let global = GLOBAL;
+
+    assert_eq!( git(&["pull"]),
+                ok(PullCmd {
+                    global, tags: false, rebase: None, repo: None,
+                    refspecs: vec![],
+                }) );
+    assert_eq!( git(&["pull", "-r"]),
+                ok(PullCmd {
+                    global, tags: false, rebase: None, repo: None,
+                    refspecs: vec![],
+                }) );
+    assert_eq!( git(&["pull", "-rpreserve"]),
+                ok(PullCmd {
+                    global, tags: false, rebase: Some("preserve"), repo: None,
+                    refspecs: vec![],
+                }) );
+    assert_eq!( git(&["pull", "-r", "preserve"]),
+                ok(PullCmd {
+                    global, tags: false, rebase: None, repo: Some("preserve"),
+                    refspecs: vec![],
+                }) );
+    assert_eq!( git(&["pull", "--rebase=preserve"]),
+                ok(PullCmd {
+                    global, tags: false, rebase: Some("preserve"), repo: None,
+                    refspecs: vec![],
+                }) );
+    assert_eq!( git(&["pull", "--rebase", "preserve"]),
+                ok(PullCmd {
+                    global, tags: false, rebase: None, repo: Some("preserve"),
+                    refspecs: vec![],
+                }) );
+    assert_eq!( git(&["pull", "--rebase=", "preserve"]),
+                ok(PullCmd {
+                    global, tags: false, rebase: Some(""), repo: Some("preserve"),
+                    refspecs: vec![],
+                }) );
+    assert_eq!( git(&["pull", "one"]),
+                ok(PullCmd {
+                    global, tags: false, rebase: None, repo: Some("one"),
+                    refspecs: vec![],
+                }) );
+    assert_eq!( git(&["pull", "one", "two"]),
+                ok(PullCmd {
+                    global, tags: false, rebase: None, repo: Some("one"),
+                    refspecs: vec!["two"],
+                }) );
+    assert_eq!( git(&["pull", "one", "two", "three"]),
+                ok(PullCmd {
+                    global, tags: false, rebase: None, repo: Some("one"),
+                    refspecs: vec!["two", "three"],
+                }) );
 }
