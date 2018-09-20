@@ -29,7 +29,7 @@ fn owned() {
         .opt('o', true)
         .opt("out".to_owned(), true);
 
-    let result: Vec<_> = config.parse_slice(&["-a", "-ofile"]).collect();
+    let result: Vec<_> = config.into_slice_iter(&["-a", "-ofile"]).collect();
 
     assert_eq!( result,
                 &[ Item::Opt(Flag::Short('a'), None),
@@ -88,6 +88,6 @@ fn assert_parse(input: &[&str], output: &[Item]) {
         .opt('o', true)
         .opt("out", true);
 
-    let result: Vec<_> = config.parse_slice(input).collect();
+    let result: Vec<_> = config.slice_iter(input).collect();
     assert_eq!( result, output );
 }

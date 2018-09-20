@@ -1,4 +1,4 @@
-use super::iter::Iter;
+use super::slice_iter::SliceIter;
 use super::flag::Flag;
 
 use std::borrow::Borrow;
@@ -25,11 +25,17 @@ pub trait Config {
 
     fn get_long_param(&self, long: &str) -> Option<Presence>;
 
-    fn parse_slice<'a, Arg>(self, args: &'a [Arg]) -> Iter<'a, Self, Arg>
-        where Self: Sized,
-              Arg:  Borrow<str> + 'a {
+    fn slice_iter<'a, Arg>(&self, args: &'a [Arg]) -> SliceIter<'a, &Self, Arg>
+        where Arg: Borrow<str> {
+        
+        SliceIter::new(self, args)
+    }
 
-        Iter::new(self, args)
+    fn into_slice_iter<Arg>(self, args: &[Arg]) -> SliceIter<Self, Arg>
+        where Self: Sized,
+              Arg:  Borrow<str> {
+
+        SliceIter::new(self, args)
     }
 }
 

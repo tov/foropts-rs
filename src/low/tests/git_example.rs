@@ -75,7 +75,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
         .opt("version", false)
         .opt("help", false);
 
-    let mut parser = config0.parse_slice(args);
+    let mut parser = config0.into_slice_iter(args);
     let mut global = GlobalOpts {
         version: false,
         help: false,
@@ -150,25 +150,28 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                     }
 
                     "init" => {
-                        *parser.config_mut() = HashConfig::new()
-                            .opt("bare", false);
+                        let init_config: &'static [_] = &[(Flag::Long("bare"), false)];
+                        let mut init_parser = parser.with_config(init_config);
 
-                        let mut bare = false;
-                        let mut dir = None;
+                        let mut result = InitCmd {
+                            global,
+                            bare: false,
+                            dir:  None,
+                        };
 
-                        while let Some(item) = parser.next() {
+                        while let Some(item) = init_parser.next() {
                             match item {
                                 Item::Opt(flag, _) => {
                                     if flag.is("bare") {
-                                        bare = true;
+                                        result.bare = true;
                                     } else {
                                         unreachable!("2");
                                     }
                                 },
 
                                 Item::Positional(arg) => {
-                                    if dir.is_none() {
-                                        dir = Some(arg);
+                                    if result.dir.is_none() {
+                                        result.dir = Some(arg);
                                     } else {
                                         Err(format!("unexpected argument: {}", arg))?;
                                     }
@@ -178,7 +181,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                             }
                         }
 
-                        return Ok(GitCmd::Init(InitCmd { global, bare, dir, }));
+                        return Ok(GitCmd::Init(result));
                     }
 
                     "add" => {

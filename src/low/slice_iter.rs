@@ -1,39 +1,14 @@
 use super::super::util::split_first_str;
-use super::config::{Config, Presence};
-use super::flag::Flag;
+use super::{Config, ErrorKind, Flag, Item, Presence};
 use self::Presence::*;
 
 use std::borrow::Borrow;
-use std::fmt;
 
 #[derive(Clone, Debug)]
-pub struct Iter<'a, Cfg, Arg: 'a> {
+pub struct SliceIter<'a, Cfg, Arg: 'a> {
     config:     Cfg,
     state:      State<'a>,
     args:       &'a [Arg],
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Item<'a> {
-    Opt(Flag<&'a str>, Option<&'a str>),
-    Positional(&'a str),
-    Error(ErrorKind<'a>),
-}
-
-impl<'a> Item<'a> {
-    pub fn is_positional(&self) -> bool {
-        match *self {
-            Item::Positional(_) => true,
-            _ => false,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ErrorKind<'a> {
-    UnknownFlag(Flag<&'a str>),
-    MissingParam(Flag<&'a str>),
-    UnexpectedParam(Flag<&'a str>, &'a str),
 }
 
 #[derive(Clone, Debug)]
@@ -43,9 +18,12 @@ enum State<'a> {
     PositionalOnly,
 }
 
-impl<'a, Cfg, Arg> Iter<'a, Cfg, Arg> {
+impl<'a, Cfg, Arg> SliceIter<'a, Cfg, Arg>
+    where Cfg: Config,
+          Arg: Borrow<str> {
+    
     pub fn new(config: Cfg, args: &'a [Arg]) -> Self {
-        Iter {
+        SliceIter {
             config,
             state: State::Start,
             args,
@@ -55,9 +33,17 @@ impl<'a, Cfg, Arg> Iter<'a, Cfg, Arg> {
     pub fn config_mut(&mut self) -> &mut Cfg {
         &mut self.config
     }
+
+    pub fn with_config<NewCfg>(self, config: NewCfg) -> SliceIter<'a, NewCfg, Arg> {
+        SliceIter {
+            config,
+            state: self.state,
+            args:  self.args,
+        }
+    }
 }
 
-impl<'a, Cfg, Arg> Iter<'a, Cfg, Arg>
+impl<'a, Cfg, Arg> SliceIter<'a, Cfg, Arg>
     where Cfg: Config,
           Arg: Borrow<str> {
 
@@ -67,19 +53,19 @@ impl<'a, Cfg, Arg> Iter<'a, Cfg, Arg>
             let param = &after_hyphens[index + 1 ..];
             let flag  = Flag::Long(long);
             match self.config.get_long_param(long) {
-                None            => Item::Error(ErrorKind::UnknownFlag(flag)),
-                Some(Never)     => Item::Error(ErrorKind::UnexpectedParam(flag, param)),
+                None             => Item::Error(ErrorKind::UnknownFlag(flag)),
+                Some(Never)      => Item::Error(ErrorKind::UnexpectedParam(flag, param)),
                 Some(IfAttached) => Item::Opt(flag, Some(param)),
-                Some(Always)    => Item::Opt(flag, Some(param)),
+                Some(Always)     => Item::Opt(flag, Some(param)),
             }
         } else {
             let long = after_hyphens;
             let flag = Flag::Long(long);
             match self.config.get_long_param(long) {
-                None            => Item::Error(ErrorKind::UnknownFlag(flag)),
-                Some(Never)     => Item::Opt(flag, None),
+                None             => Item::Error(ErrorKind::UnknownFlag(flag)),
+                Some(Never)      => Item::Opt(flag, None),
                 Some(IfAttached) => Item::Opt(flag, None),
-                Some(Always)    => match self.next_arg() {
+                Some(Always)     => match self.next_arg() {
                     None           => Item::Error(ErrorKind::MissingParam(flag)),
                     Some(param)    => Item::Opt(flag, Some(param)),
                 },
@@ -136,7 +122,7 @@ impl<'a, Cfg, Arg> Iter<'a, Cfg, Arg>
     }
 }
 
-impl<'a, Cfg, Arg> Iterator for Iter<'a, Cfg, Arg>
+impl<'a, Cfg, Arg> Iterator for SliceIter<'a, Cfg, Arg>
     where Cfg: Config,
           Arg: Borrow<str> {
 
@@ -176,30 +162,3 @@ impl<'a, Cfg, Arg> Iterator for Iter<'a, Cfg, Arg>
     }
 }
 
-impl<'a> fmt::Display for Item<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Item::Opt(Flag::Short(c), None)         => write!(f, "-{}", c),
-            Item::Opt(Flag::Long(s), None)          => write!(f, "--{}", s),
-            Item::Opt(Flag::Short(c), Some(param))  => write!(f, "-{}{}", c, param),
-            Item::Opt(Flag::Long(s), Some(param))   => write!(f, "--{}={}", s, param),
-            Item::Positional(arg)                   => f.write_str(arg),
-            Item::Error(kind)                       => write!(f, "<error: {}>", kind),
-        }
-    }
-}
-
-impl<'a> fmt::Display for ErrorKind<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            ErrorKind::UnknownFlag(flag) =>
-                write!(f, "unknown flag: {}", flag),
-
-            ErrorKind::MissingParam(flag) =>
-                write!(f, "missing parameter for: {}", flag),
-
-            ErrorKind::UnexpectedParam(flag, param) =>
-                write!(f, "unexpected parameter ‘{}’ for: {}", param, flag),
-        }
-    }
-}

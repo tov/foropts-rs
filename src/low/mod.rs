@@ -1,12 +1,16 @@
 //! A low-level, borrowing argument parser.
 
 mod config;
+mod errors;
 mod flag;
-mod iter;
+mod item;
+mod slice_iter;
 
 #[cfg(test)]
 mod tests;
 
 pub use self::config::{Presence, Config, HashConfig, FnConfig};
+pub use self::errors::ErrorKind;
 pub use self::flag::Flag;
-pub use self::iter::{Iter, Item, ErrorKind};
+pub use self::item::Item;
+pub use self::slice_iter::SliceIter;
