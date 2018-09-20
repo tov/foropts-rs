@@ -340,7 +340,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                                     if flag.is('t') || flag.is("tags") {
                                         command.tags = true;
                                     } else if flag.is('r') || flag.is("rebase") {
-                                        command.rebase = param;
+                                        command.rebase = param.or(Some(""));
                                     } else {
                                         unreachable!("6");
                                     }
@@ -568,7 +568,7 @@ fn pull_tests() {
                 }) );
     assert_eq!( git(&["pull", "-r"]),
                 ok(PullCmd {
-                    global, tags: false, rebase: None, repo: None,
+                    global, tags: false, rebase: Some(""), repo: None,
                     refspecs: vec![],
                 }) );
     assert_eq!( git(&["pull", "-rpreserve"]),
@@ -578,7 +578,7 @@ fn pull_tests() {
                 }) );
     assert_eq!( git(&["pull", "-r", "preserve"]),
                 ok(PullCmd {
-                    global, tags: false, rebase: None, repo: Some("preserve"),
+                    global, tags: false, rebase: Some(""), repo: Some("preserve"),
                     refspecs: vec![],
                 }) );
     assert_eq!( git(&["pull", "--rebase=preserve"]),
@@ -588,7 +588,7 @@ fn pull_tests() {
                 }) );
     assert_eq!( git(&["pull", "moo", "--rebase", "preserve"]),
                 ok(PullCmd {
-                    global, tags: false, rebase: None, repo: Some("moo"),
+                    global, tags: false, rebase: Some(""), repo: Some("moo"),
                     refspecs: vec!["preserve"],
                 }) );
     assert_eq!( git(&["pull", "--rebase=", "preserve"]),
