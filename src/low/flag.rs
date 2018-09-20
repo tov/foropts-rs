@@ -21,11 +21,13 @@ impl<L: Borrow<str>> Flag<L> {
         !self.is_short()
     }
 
-    pub fn is<F: Into<Flag<L>>>(&self, other: F) -> bool {
+    pub fn is<'a, F>(&self, other: F) -> bool
+        where F: Into<Flag<&'a str>> {
+
         match (self, other.into()) {
-            (&Short(c1),    Short(c2))    => c1 == c2,
-            (&Long(ref s1), Long(ref s2)) => s1.borrow() == s2.borrow(),
-            _                             => false,
+            (&Short(c1),    Short(c2)) => c1 == c2,
+            (&Long(ref s1), Long(s2))  => s1.borrow() == s2,
+            _                          => false,
         }
     }
 }
