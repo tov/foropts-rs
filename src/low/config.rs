@@ -123,6 +123,20 @@ impl<L> HashConfig<L>
     }
 }
 
+pub struct FnConfig<F>(pub F);
+
+impl<F> Config for FnConfig<F>
+    where F: Fn(Flag<&str>) -> Option<Presence> {
+    
+    fn get_short_param(&self, short: char) -> Option<Presence> {
+        self.0(Flag::Short(short))
+    }
+
+    fn get_long_param(&self, long: &str) -> Option<Presence> {
+        self.0(Flag::Long(long))
+    }
+}
+
 impl<T: Config, U: Config> Config for (T, U) {
     fn get_short_param(&self, short: char) -> Option<Presence> {
         self.0.get_short_param(short).or_else(||
@@ -219,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn layer_config() {
+    fn pair_config() {
         let common_config = [
             (Short('v'), Never),      (Long("verbose"),  Never),
             (Short('q'), Never),      (Long("quiet"),    Never),
@@ -234,6 +248,33 @@ mod tests {
 
         let config = (specific_config, &common_config as &[_]);
 
+        check_config(config);
+    }
+
+    #[test]
+    fn fn_config() {
+        fn get(flag: Flag<&str>) -> Option<Presence> {
+            let presence = match flag {
+                Short('a')       => Never,
+                Long("all")      => Never,
+                Long("log")      => IfAttached,
+                Short('m')       => Always,
+                Long("message")  => Always,
+                Short('r')       => IfAttached,
+                Long("rebase")   => IfAttached,
+                Short('s')       => Always,
+                Long("strategy") => Always,
+                Short('v')       => Never,
+                Long("verbose")  => Never,
+                Short('q')       => Never,
+                Long("quiet")    => Never,
+                _                => return None,
+            };
+            Some(presence)
+        }
+
+        let config = FnConfig(get);
+        
         check_config(config);
     }
 }
