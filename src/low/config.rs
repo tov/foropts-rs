@@ -123,27 +123,15 @@ impl<L> HashConfig<L>
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct LayerConfig<T, U> {
-    pub first:  T,
-    pub second: U,
-}
-
-impl<T, U> LayerConfig<T, U> {
-    pub fn new(first: T, second: U) -> Self {
-        LayerConfig { first, second }
-    }
-}
-
-impl<T: Config, U: Config> Config for LayerConfig<T, U> {
+impl<T: Config, U: Config> Config for (T, U) {
     fn get_short_param(&self, short: char) -> Option<Presence> {
-        self.first.get_short_param(short).or_else(||
-            self.second.get_short_param(short))
+        self.0.get_short_param(short).or_else(||
+            self.1.get_short_param(short))
     }
 
     fn get_long_param(&self, long: &str) -> Option<Presence> {
-        self.first.get_long_param(long).or_else(||
-            self.second.get_long_param(long))
+        self.0.get_long_param(long).or_else(||
+            self.1.get_long_param(long))
     }
 }
 
@@ -281,7 +269,7 @@ mod tests {
             .both('r', "rebase",    IfAttached)
             .both('s', "strategy",  Always);
 
-        let config = LayerConfig::new(specific_config, &common_config as &[_]);
+        let config = (specific_config, &common_config as &[_]);
 
         check_config(config);
     }
