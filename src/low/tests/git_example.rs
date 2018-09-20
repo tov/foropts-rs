@@ -290,7 +290,9 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                                     } else if flag.is('a') || flag.is("all") {
                                         command.all = true;
                                     } else if flag.is("repo") {
-                                        if !positional_repo {
+                                        if positional_repo {
+                                            Err("repo already given")?
+                                        } else {
                                             command.repo = param;
                                         }
                                     } else {
@@ -523,6 +525,33 @@ fn push_tests() {
                     global, verbose: false, force: false, delete: false, all: false,
                     repo: Some("a_repo"), refspecs: vec!["a_refspec", "another"],
                 }) );
+    assert_eq!( git(&["push", "--repo", "flag_repo"]),
+                ok(PushCmd {
+                    global, verbose: false, force: false, delete: false, all: false,
+                    repo: Some("flag_repo"), refspecs: vec![],
+                }) );
+    assert_eq!( git(&["push", "--repo", "flag_repo", "--repo", "afr"]),
+                ok(PushCmd {
+                    global, verbose: false, force: false, delete: false, all: false,
+                    repo: Some("afr"), refspecs: vec![],
+                }) );
+    assert_eq!( git(&["push", "--repo", "flag_repo", "--repo", "afr", "a_refspec"]),
+                ok(PushCmd {
+                    global, verbose: false, force: false, delete: false, all: false,
+                    repo: Some("a_refspec"), refspecs: vec![],
+                }) );
+    assert_eq!( git(&["push", "--repo", "flag_repo", "a_repo", "a_refspec"]),
+                ok(PushCmd {
+                    global, verbose: false, force: false, delete: false, all: false,
+                    repo: Some("a_repo"), refspecs: vec!["a_refspec"],
+                }) );
+    assert_eq!( git(&["push", "--repo", "flag_repo", "a_repo", "a_refspec", "another"]),
+                ok(PushCmd {
+                    global, verbose: false, force: false, delete: false, all: false,
+                    repo: Some("a_repo"), refspecs: vec!["a_refspec", "another"],
+                }) );
+    assert_eq!( git(&["push", "a_repo", "--repo", "flag_repo", "a_refspec", "another"]),
+                err!("repo already given") );
 }
 
 #[test]
@@ -555,10 +584,10 @@ fn pull_tests() {
                     global, tags: false, rebase: Some("preserve"), repo: None,
                     refspecs: vec![],
                 }) );
-    assert_eq!( git(&["pull", "--rebase", "preserve"]),
+    assert_eq!( git(&["pull", "moo", "--rebase", "preserve"]),
                 ok(PullCmd {
-                    global, tags: false, rebase: None, repo: Some("preserve"),
-                    refspecs: vec![],
+                    global, tags: false, rebase: None, repo: Some("moo"),
+                    refspecs: vec!["preserve"],
                 }) );
     assert_eq!( git(&["pull", "--rebase=", "preserve"]),
                 ok(PullCmd {
