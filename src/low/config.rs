@@ -4,6 +4,8 @@ use super::flag::Flag;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Presence {
@@ -123,17 +125,52 @@ impl<L> HashConfig<L>
     }
 }
 
-pub struct FnConfig<F>(pub F);
+#[derive(Debug, Clone, Copy)]
+pub struct FnConfig<F, P> {
+    fun:     F,
+    phantom: PhantomData<fn() -> P>,
+}
 
-impl<F> Config for FnConfig<F>
-    where F: Fn(Flag<&str>) -> Option<Presence> {
+impl<F, P> FnConfig<F, P> {
+    pub fn new(fun: F) -> Self
+        where F: Fn(Flag<&str>) -> Option<P>,
+              P: Into<Presence> {
+
+        FnConfig {
+            fun,
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn into_inner(self) -> F {
+        self.fun
+    }
+}
+
+impl<F, P> Deref for FnConfig<F, P> {
+    type Target = F;
+
+    fn deref(&self) -> &F {
+        &self.fun
+    }
+}
+
+impl<F, P> DerefMut for FnConfig<F, P> {
+    fn deref_mut(&mut self) -> &mut F {
+        &mut self.fun
+    }
+}
+
+impl<F, P> Config for FnConfig<F, P>
+    where F: Fn(Flag<&str>) -> Option<P>,
+          P: Into<Presence> {
     
     fn get_short_param(&self, short: char) -> Option<Presence> {
-        self.0(Flag::Short(short))
+        (self.fun)(Flag::Short(short)).map(Into::into)
     }
 
     fn get_long_param(&self, long: &str) -> Option<Presence> {
-        self.0(Flag::Long(long))
+        (self.fun)(Flag::Long(long)).map(Into::into)
     }
 }
 
@@ -273,8 +310,16 @@ mod tests {
             Some(presence)
         }
 
-        let config = FnConfig(get);
-        
+        let config = FnConfig::new(get);
+
         check_config(config);
+        assert_eq!( config(Short('m')), Some(Always) );
+    }
+
+    #[test]
+    fn allow_everything() {
+        let config = FnConfig::new(|_| Some(IfAttached));
+        assert_eq!( config.get_short_param('q'), Some(IfAttached) );
+        assert_eq!( config.get_long_param("tralala"), Some(IfAttached) );
     }
 }
