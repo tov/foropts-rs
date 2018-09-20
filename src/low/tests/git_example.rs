@@ -101,37 +101,37 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                             .opt('q', false).opt("quiet", false)
                             .opt('j', true).opt("jobs", true);
 
-                        enum State<'a> {
-                            Nothing,
-                            RepoDir(&'a str, Option<&'a str>),
-                        }
+                        let mut command = CloneCmd {
+                            global,
+                            verbose: false,
+                            jobs:    None,
+                            repo:    "",
+                            dir:     None,
+                        };
+                        let mut repo_set = false;
 
-                        let mut verbose = false;
-                        let mut jobs    = None;
-                        let mut state   = State::Nothing;
-
-                        while let Some(item) = parser.next() {
+                        for item in parser {
                             match item {
                                 Item::Opt(flag, param) => {
                                     if flag.is('v') || flag.is("verbose") {
-                                        verbose = true;
+                                        command.verbose = true;
                                     } else if flag.is('q') || flag.is("quiet") {
-                                        verbose = false;
+                                        command.verbose = false;
                                     } else if flag.is('j') || flag.is("jobs") {
-                                        jobs = param;
+                                        command.jobs = param;
                                     } else {
                                         unreachable!("1");
                                     }
                                 }
 
                                 Item::Positional(pos) => {
-                                    match state {
-                                        State::Nothing =>
-                                            state = State::RepoDir(pos, None),
-                                        State::RepoDir(repo, None) =>
-                                            state = State::RepoDir(repo, Some(pos)),
-                                        State::RepoDir(_, Some(_)) =>
-                                            Err(format!("unexpected argument: {}", pos))?,
+                                    if !repo_set {
+                                        command.repo = pos;
+                                        repo_set    = true;
+                                    } else if command.dir.is_none() {
+                                        command.dir = Some(pos);
+                                    } else {
+                                        Err(format!("unexpected argument: {}", pos))?;
                                     }
                                 }
 
@@ -141,12 +141,11 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                             }
                         }
 
-                        match state {
-                            State::Nothing => Err("expected argument: repo")?,
-                            State::RepoDir(repo, dir) => return Ok(GitCmd::Clone(CloneCmd {
-                                global, verbose, jobs, repo, dir,
-                            })),
+                        if !repo_set {
+                            return Err("expected argument: repo".to_owned());
                         }
+
+                        return Ok(GitCmd::Clone(command));
                     }
 
                     "init" => {
