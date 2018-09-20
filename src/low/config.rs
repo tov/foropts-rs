@@ -163,7 +163,10 @@ impl<'a> Config for SliceConfig<'a> {
     }
 }
 
-impl<L: Borrow<str>, P: Copy + Into<Presence>> Config for [(Flag<L>, P)] {
+impl<L, P> Config for [(Flag<L>, P)]
+    where L: Borrow<str>,
+          P: Copy + Into<Presence> {
+
     fn get_short_param(&self, name: char) -> Option<Presence> {
         self.into_iter().find(|pair| pair.0.is(name)).map(|pair| pair.1.into())
     }
