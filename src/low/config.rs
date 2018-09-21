@@ -9,8 +9,72 @@ use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Presence {
+    /// Option will expect a parameter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use foropts::low::*;
+    /// let config = FnConfig::new(|_| Some(Presence::Always));
+    ///
+    /// let result: Vec<_> = config.slice_iter(&[
+    ///     "-a", "foo", "-bbar", "--cee", "baz", "--dee=qux", "-e"
+    /// ]).collect();
+    ///
+    /// assert_eq!( result,
+    ///             &[Item::Opt(Flag::Short('a'), Some("foo")),
+    ///               Item::Opt(Flag::Short('b'), Some("bar")),
+    ///               Item::Opt(Flag::Long("cee"), Some("baz")),
+    ///               Item::Opt(Flag::Long("dee"), Some("qux")),
+    ///               Item::Error(ErrorKind::MissingParam(Flag::Short('e')))] );
+    /// ```
     Always,
+    /// Option will recognize a parameter if attached.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use foropts::low::*;
+    /// let config = FnConfig::new(|_| Some(Presence::IfAttached));
+    ///
+    /// let result: Vec<_> = config.slice_iter(&[
+    ///     "-a", "foo", "-bbar", "--cee", "baz", "--dee=qux", "-e"
+    /// ]).collect();
+    ///
+    /// assert_eq!( result,
+    ///             &[Item::Opt(Flag::Short('a'), None),
+    ///               Item::Positional("foo"),
+    ///               Item::Opt(Flag::Short('b'), Some("bar")),
+    ///               Item::Opt(Flag::Long("cee"), None),
+    ///               Item::Positional("baz"),
+    ///               Item::Opt(Flag::Long("dee"), Some("qux")),
+    ///               Item::Opt(Flag::Short('e'), None) ]);
+    /// ```
     IfAttached,
+    /// Option will not expect a parameter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use foropts::low::*;
+    /// let config = FnConfig::new(|_| Some(Presence::Never));
+    ///
+    /// let result: Vec<_> = config.slice_iter(&[
+    ///     "-a", "foo", "-bbar", "--cee", "baz", "--dee=qux", "-e"
+    /// ]).collect();
+    ///
+    /// assert_eq!( result,
+    ///             &[Item::Opt(Flag::Short('a'), None),
+    ///               Item::Positional("foo"),
+    ///               Item::Opt(Flag::Short('b'), None),
+    ///               Item::Opt(Flag::Short('b'), None),
+    ///               Item::Opt(Flag::Short('a'), None),
+    ///               Item::Opt(Flag::Short('r'), None),
+    ///               Item::Opt(Flag::Long("cee"), None),
+    ///               Item::Positional("baz"),
+    ///               Item::Error(ErrorKind::UnexpectedParam(Flag::Long("dee"), "qux")),
+    ///               Item::Opt(Flag::Short('e'), None) ]);
+    /// ```
     Never,
 }
 
