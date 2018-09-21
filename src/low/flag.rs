@@ -9,18 +9,20 @@ pub enum Flag<L> {
 
 use self::Flag::*;
 
-impl<L: Borrow<str>> Flag<L> {
+impl<L> Flag<L> {
     pub fn is_short(&self) -> bool {
         match *self {
             Short(_) => true,
-            Long(_)  => false,
+            Long(_) => false,
         }
     }
 
     pub fn is_long(&self) -> bool {
         !self.is_short()
     }
+}
 
+impl<L: Borrow<str>> Flag<L> {
     pub fn is<'a, F>(&self, other: F) -> bool
         where F: Into<Flag<&'a str>> {
 
