@@ -3,49 +3,51 @@ use super::{Config, ErrorKind, Flag, Item, Presence};
 use self::Presence::*;
 
 use std::borrow::Borrow;
+use std::fmt;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct SliceIter<'a, Cfg, Arg: 'a> {
     config:     Cfg,
     state:      State<'a, Arg>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct State<'a, Arg: 'a> {
     first:      InnerState<'a>,
     rest:       &'a [Arg],
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 enum InnerState<'a> {
     Start,
     ShortOpts(&'a str),
     PositionalOnly,
 }
 
+
 impl<'a, Cfg, Arg> SliceIter<'a, Cfg, Arg>
     where Cfg: Config,
           Arg: Borrow<str> {
-    
+
     pub fn new(config: Cfg, args: &'a [Arg]) -> Self {
         SliceIter {
             config,
             state: State {
                 first: InnerState::Start,
-                rest:  args,
+                rest: args,
             }
         }
-    }
-
-    pub fn next_with_config<Cfg1: Config>(&mut self, config: Cfg1) -> Option<Item<'a>> {
-        self.state.next_with_config(config)
     }
 
     pub fn config_mut(&mut self) -> &mut Cfg {
         &mut self.config
     }
 
-    pub fn with_config<NewCfg>(self, config: NewCfg) -> SliceIter<'a, NewCfg, Arg> {
+    pub fn next_with_config<Cfg1: Config>(&mut self, config: Cfg1) -> Option<Item<'a>> {
+        self.state.next_with_config(config)
+    }
+
+    pub fn with_config<Cfg1>(self, config: Cfg1) -> SliceIter<'a, Cfg1, Arg> {
         SliceIter {
             config,
             state: self.state,
@@ -173,6 +175,40 @@ impl<'a, Cfg, Arg> Iterator for SliceIter<'a, Cfg, Arg>
 
     fn next(&mut self) -> Option<Item<'a>> {
         self.state.next_with_config(&self.config)
+    }
+}
+
+impl<'a, Cfg, Arg> fmt::Debug for SliceIter<'a, Cfg, Arg>
+    where Cfg: fmt::Debug,
+          Arg: Borrow<str> {
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("SliceIter")
+            .field("config", &self.config)
+            .field("state", &self.state)
+            .finish()
+    }
+}
+
+impl<'a, Arg> fmt::Debug for State<'a, Arg>
+    where Arg: Borrow<str> {
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut list = f.debug_list();
+
+        match self.first {
+            InnerState::Start => (),
+            InnerState::ShortOpts(shorts) => {
+                list.entry(&format!("-{}", shorts));
+            }
+            InnerState::PositionalOnly => {
+                list.entry(&"--");
+            }
+        }
+
+        list.entries(self.rest.into_iter().map(Borrow::borrow));
+
+        list.finish()
     }
 }
 
