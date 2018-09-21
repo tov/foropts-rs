@@ -1,5 +1,6 @@
 //! A low-level, borrowing argument parser.
 
+mod common;
 mod config;
 mod errors;
 mod flag;

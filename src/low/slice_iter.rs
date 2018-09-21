@@ -1,4 +1,5 @@
 use super::super::util::split_first_str;
+use super::common::InnerState;
 use super::{Config, ErrorKind, Flag, Item, Presence};
 use self::Presence::*;
 
@@ -16,14 +17,6 @@ struct State<'a, Arg: 'a> {
     first:      InnerState<'a>,
     rest:       &'a [Arg],
 }
-
-#[derive(Clone)]
-enum InnerState<'a> {
-    Start,
-    ShortOpts(&'a str),
-    PositionalOnly,
-}
-
 
 impl<'a, Cfg, Arg> SliceIter<'a, Cfg, Arg>
     where Cfg: Config,
@@ -196,15 +189,7 @@ impl<'a, Arg> fmt::Debug for State<'a, Arg>
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut list = f.debug_list();
 
-        match self.first {
-            InnerState::Start => (),
-            InnerState::ShortOpts(shorts) => {
-                list.entry(&format!("-{}", shorts));
-            }
-            InnerState::PositionalOnly => {
-                list.entry(&"--");
-            }
-        }
+        self.first.fmt_to_debug_list(&mut list);
 
         list.entries(self.rest.into_iter().map(Borrow::borrow));
 

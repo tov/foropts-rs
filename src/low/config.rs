@@ -8,8 +8,24 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Whether a particular option expects/recognizes parameters.
+///
+/// When queried about a flag, a [`Config`] returns a `Presence` to determine
+/// how to parse it—in particular, whether to expect a parameter to follow.
+///
+/// Functions that accept `Presence`s usually accept any type that implements
+/// `Into<Presence>`. This includes `bool`, where `true` maps to [`Always`]
+/// and `false` maps to [`Never`].
+///
+/// [`Config`]: trait.Config.html
+/// [`Always`]: #variant.Always
+/// [`Never`]: #variant.Never
 pub enum Presence {
     /// Option will expect a parameter.
+    ///
+    /// If a parameter is not found,
+    /// [`ErrorKind::MissingParam`](enum.ErrorKind.html#variant.MissingParam)
+    /// is returned. This can only happen at the end of the arguments.
     ///
     /// # Examples
     ///
@@ -30,6 +46,10 @@ pub enum Presence {
     /// ```
     Always,
     /// Option will recognize a parameter if attached.
+    ///
+    /// For short options, this means that anything in the token following
+    /// the flag will be considered the parameter; for long options, an
+    /// equals sign (`=`) must be provided to recognize a parameter.
     ///
     /// # Examples
     ///
@@ -52,6 +72,11 @@ pub enum Presence {
     /// ```
     IfAttached,
     /// Option will not expect a parameter.
+    ///
+    /// It is an error to provide a long option with an equals sign (`=`), in
+    /// which case
+    /// [`ErrorKind::UnexpectedParam`](enum.ErrorKind.html#variant.UnexpectedParam)
+    /// will be returned.
     ///
     /// # Examples
     ///
