@@ -12,7 +12,7 @@ mod slice_iter;
 #[cfg(test)]
 mod tests;
 
-pub use self::config::{Config, HashConfig, TokenHashConfig, FnConfig};
+pub use self::config::{Config, HashConfig, TokenHashConfig, FnConfig, TokenFnConfig};
 pub use self::errors::ErrorKind;
 pub use self::flag::Flag;
 pub use self::item::Item;

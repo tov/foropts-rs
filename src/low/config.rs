@@ -33,11 +33,11 @@ pub trait Config {
 impl<'a, C: Config + ?Sized> Config for &'a C {
     type Token = C::Token;
 
-    fn get_short_policy(&self, short: char) -> Option<Policy<C::Token>> {
+    fn get_short_policy(&self, short: char) -> Option<Policy<Self::Token>> {
         C::get_short_policy(self, short)
     }
 
-    fn get_long_policy(&self, long: &str) -> Option<Policy<C::Token>> {
+    fn get_long_policy(&self, long: &str) -> Option<Policy<Self::Token>> {
         C::get_long_policy(self, long)
     }
 }
@@ -45,11 +45,11 @@ impl<'a, C: Config + ?Sized> Config for &'a C {
 impl<C: Config + ?Sized> Config for Box<C> {
     type Token = C::Token;
 
-    fn get_short_policy(&self, short: char) -> Option<Policy<C::Token>> {
+    fn get_short_policy(&self, short: char) -> Option<Policy<Self::Token>> {
         C::get_short_policy(&self, short)
     }
 
-    fn get_long_policy(&self, long: &str) -> Option<Policy<C::Token>> {
+    fn get_long_policy(&self, long: &str) -> Option<Policy<Self::Token>> {
         C::get_long_policy(&self, long)
     }
 }
@@ -147,18 +147,20 @@ impl<L, T> TokenHashConfig<L, T>
     }
 }
 
+pub type FnConfig<F, P> = TokenFnConfig<F, P, ()>;
+
 #[derive(Debug, Clone, Copy)]
-pub struct FnConfig<F, P> {
+pub struct TokenFnConfig<F, P, T> {
     fun:     F,
-    phantom: PhantomData<fn() -> P>,
+    phantom: PhantomData<fn() -> (P, T)>,
 }
 
-impl<F, P> FnConfig<F, P> {
+impl<F, P, T> TokenFnConfig<F, P, T> {
     pub fn new(fun: F) -> Self
         where F: Fn(Flag<&str>) -> Option<P>,
-              P: Into<Presence> {
+              P: Into<Policy<T>> {
 
-        FnConfig {
+        TokenFnConfig {
             fun,
             phantom: PhantomData,
         }
@@ -169,7 +171,7 @@ impl<F, P> FnConfig<F, P> {
     }
 }
 
-impl<F, P> Deref for FnConfig<F, P> {
+impl<F, P, T> Deref for TokenFnConfig<F, P, T> {
     type Target = F;
 
     fn deref(&self) -> &F {
@@ -177,24 +179,24 @@ impl<F, P> Deref for FnConfig<F, P> {
     }
 }
 
-impl<F, P> DerefMut for FnConfig<F, P> {
+impl<F, P, T> DerefMut for TokenFnConfig<F, P, T> {
     fn deref_mut(&mut self) -> &mut F {
         &mut self.fun
     }
 }
 
-impl<F, P> Config for FnConfig<F, P>
+impl<F, P, T> Config for TokenFnConfig<F, P, T>
     where F: Fn(Flag<&str>) -> Option<P>,
-          P: Into<Presence> {
+          P: Into<Policy<T>> {
 
-    type Token = ();
-    
-    fn get_short_policy(&self, short: char) -> Option<Policy<()>> {
-        (self.fun)(Flag::Short(short)).map(Into::<Policy<()>>::into)
+    type Token = T;
+
+    fn get_short_policy(&self, short: char) -> Option<Policy<T>> {
+        (self.fun)(Flag::Short(short)).map(Into::into)
     }
 
-    fn get_long_policy(&self, long: &str) -> Option<Policy<()>> {
-        (self.fun)(Flag::Long(long)).map(Into::<Policy<()>>::into)
+    fn get_long_policy(&self, long: &str) -> Option<Policy<T>> {
+        (self.fun)(Flag::Long(long)).map(Into::into)
     }
 }
 
@@ -258,27 +260,31 @@ mod tests {
     use super::super::Flag::*;
     use super::super::Presence::*;
 
-    fn pres<T>(res: Option<Policy<T>>) -> Option<Presence> {
-        res.map(|policy| policy.presence)
+    fn get_short<C: Config>(config: C, name: char) -> Option<Presence> {
+        config.get_short_policy(name).map(|policy| policy.presence)
+    }
+
+    fn get_long<C: Config>(config: C, name: &str) -> Option<Presence> {
+        config.get_long_policy(name).map(|policy| policy.presence)
     }
 
     fn check_config<C: Config>(config: C) {
-        assert_eq!(pres(config.get_short_policy('a')), Some(Never) );
-        assert_eq!(pres(config.get_short_policy('b')), None );
-        assert_eq!(pres(config.get_short_policy('m')), Some(Always) );
-        assert_eq!(pres(config.get_short_policy('r')), Some(IfAttached) );
-        assert_eq!(pres(config.get_short_policy('s')), Some(Always) );
-        assert_eq!(pres(config.get_short_policy('v')), Some(Never) );
-        assert_eq!(pres(config.get_short_policy('q')), Some(Never) );
+        assert_eq!(get_short(&config, 'a'), Some(Never) );
+        assert_eq!(get_short(&config, 'b'), None );
+        assert_eq!(get_short(&config, 'm'), Some(Always) );
+        assert_eq!(get_short(&config, 'r'), Some(IfAttached) );
+        assert_eq!(get_short(&config, 's'), Some(Always) );
+        assert_eq!(get_short(&config, 'v'), Some(Never) );
+        assert_eq!(get_short(&config, 'q'), Some(Never) );
 
-        assert_eq!(pres(config.get_long_policy("all")), Some(Never) );
-        assert_eq!(pres(config.get_long_policy("bare")), None );
-        assert_eq!(pres(config.get_long_policy("log")), Some(IfAttached) );
-        assert_eq!(pres(config.get_long_policy("message")), Some(Always) );
-        assert_eq!(pres(config.get_long_policy("rebase")), Some(IfAttached) );
-        assert_eq!(pres(config.get_long_policy("strategy")), Some(Always) );
-        assert_eq!(pres(config.get_long_policy("verbose")), Some(Never) );
-        assert_eq!(pres(config.get_long_policy("quiet")), Some(Never) );
+        assert_eq!(get_long(&config, "all"), Some(Never) );
+        assert_eq!(get_long(&config, "bare"), None );
+        assert_eq!(get_long(&config, "log"), Some(IfAttached) );
+        assert_eq!(get_long(&config, "message"), Some(Always) );
+        assert_eq!(get_long(&config, "rebase"), Some(IfAttached) );
+        assert_eq!(get_long(&config, "strategy"), Some(Always) );
+        assert_eq!(get_long(&config, "verbose"), Some(Never) );
+        assert_eq!(get_long(&config, "quiet"), Some(Never) );
     }
 
     #[test]
@@ -297,18 +303,18 @@ mod tests {
 
     #[test]
     fn bare_bool_config() {
-        let config = [
+        let config: &[_] = &[
             (Short('a'), false),    (Long("all"), false),
             (Short('m'), true),     (Long("message"), true),
         ];
 
-        assert_eq!( pres(config.get_short_policy('a')),        Some(Never) );
-        assert_eq!( pres(config.get_short_policy('b')),        None );
-        assert_eq!( pres(config.get_short_policy('m')),        Some(Always) );
+        assert_eq!( get_short(&config, 'a'),        Some(Never) );
+        assert_eq!( get_short(&config, 'b'),        None );
+        assert_eq!( get_short(&config, 'm'),        Some(Always) );
 
-        assert_eq!( pres(config.get_long_policy("all")),       Some(Never) );
-        assert_eq!( pres(config.get_long_policy("bare")),      None );
-        assert_eq!( pres(config.get_long_policy("message")),   Some(Always) );
+        assert_eq!( get_long(&config, "bare"),      None );
+        assert_eq!( get_long(&config, "all"),       Some(Never) );
+        assert_eq!( get_long(&config, "message"),   Some(Always) );
     }
 
     #[test]
@@ -376,7 +382,7 @@ mod tests {
     #[test]
     fn allow_everything() {
         let config = FnConfig::new(|_| Some(IfAttached));
-        assert_eq!( pres(config.get_short_policy('q')), Some(IfAttached) );
-        assert_eq!( pres(config.get_long_policy("tralala")), Some(IfAttached) );
+        assert_eq!( get_short(&config, 'q'), Some(IfAttached) );
+        assert_eq!( get_long(&config, "tralala"), Some(IfAttached) );
     }
 }
