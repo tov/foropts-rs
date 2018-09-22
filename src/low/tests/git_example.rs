@@ -71,7 +71,7 @@ struct PullCmd<'a> {
 }
 
 fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
-    let config0 = HashConfig::new()
+    let config0 = HashConfig0::new()
         .opt("version", false)
         .opt("help", false);
 
@@ -96,7 +96,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
             Item::Positional(command) => {
                 match command {
                     "clone" => {
-                        *parser.config_mut() = HashConfig::new()
+                        *parser.config_mut() = HashConfig0::new()
                             .opt('v', false).opt("verbose", false)
                             .opt('q', false).opt("quiet", false)
                             .opt('j', true).opt("jobs", true);
@@ -184,7 +184,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                     }
 
                     "add" => {
-                        *parser.config_mut() = HashConfig::new()
+                        *parser.config_mut() = HashConfig0::new()
                             .opt('n', false).opt("dry-run", false)
                             .opt('v', false).opt("verbose", false)
                             .opt('i', false).opt("interactive", false)
@@ -225,7 +225,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                     }
 
                     "commit" => {
-                        *parser.config_mut() = HashConfig::new()
+                        *parser.config_mut() = HashConfig0::new()
                             .opt('m', true).opt("message", true)
                             .opt('a', false).opt("all", false);
 
@@ -263,7 +263,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                             Verbose, Quiet, Force, Delete, All, Repo
                         }
 
-                        let config: TokenHashConfig<&str, _> = TokenHashConfig::new()
+                        let config: HashConfig<&str, _> = HashConfig::new()
                             .both('v', "verbose", (false, PushFlag::Verbose))
                             .both('q', "quiet",   (false, PushFlag::Quiet))
                             .both('f', "force",   (false, PushFlag::Force))
@@ -317,7 +317,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                     }
 
                     "pull" => {
-                        *parser.config_mut() = HashConfig::new()
+                        *parser.config_mut() = HashConfig0::new()
                             .opt('t', false).opt("tags", false)
                             .opt('r', Presence::IfAttached)
                             .opt("rebase", Presence::IfAttached);

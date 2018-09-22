@@ -54,16 +54,16 @@ impl<C: Config + ?Sized> Config for Box<C> {
     }
 }
 
-pub type HashConfig<L> = TokenHashConfig<L, ()>;
+pub type HashConfig0<L> = HashConfig<L, ()>;
 
 /// The configuration for the argument parser.
 #[derive(Clone)]
-pub struct TokenHashConfig<L, T> {
+pub struct HashConfig<L, T> {
     short_opts: HashMap<char, Policy<T>>,
     long_opts:  HashMap<L, Policy<T>>,
 }
 
-impl<L, T> fmt::Debug for TokenHashConfig<L, T>
+impl<L, T> fmt::Debug for HashConfig<L, T>
     where L: Eq + Hash + Borrow<str>,
           T: fmt::Debug {
     
@@ -82,7 +82,7 @@ impl<L, T> fmt::Debug for TokenHashConfig<L, T>
     }
 }
 
-impl<L, T> Config for TokenHashConfig<L, T>
+impl<L, T> Config for HashConfig<L, T>
     where L: Eq + Hash + Borrow<str>,
           T: Clone {
 
@@ -97,18 +97,18 @@ impl<L, T> Config for TokenHashConfig<L, T>
     }
 }
 
-impl<L, T> TokenHashConfig<L, T>
+impl<L, T> HashConfig<L, T>
     where L: Eq + Hash + Borrow<str> {
 
     pub fn new() -> Self {
-        TokenHashConfig {
+        HashConfig {
             short_opts: HashMap::new(),
             long_opts:  HashMap::new(),
         }
     }
 
     pub fn with_capacities(shorts: usize, longs: usize) -> Self {
-        TokenHashConfig {
+        HashConfig {
             short_opts: HashMap::with_capacity(shorts),
             long_opts:  HashMap::with_capacity(longs),
         }
@@ -147,20 +147,20 @@ impl<L, T> TokenHashConfig<L, T>
     }
 }
 
-pub type FnConfig<F, P> = TokenFnConfig<F, P, ()>;
+pub type FnConfig0<F, P> = FnConfig<F, P, ()>;
 
 #[derive(Debug, Clone, Copy)]
-pub struct TokenFnConfig<F, P, T> {
+pub struct FnConfig<F, P, T> {
     fun:     F,
     phantom: PhantomData<fn() -> (P, T)>,
 }
 
-impl<F, P, T> TokenFnConfig<F, P, T> {
+impl<F, P, T> FnConfig<F, P, T> {
     pub fn new(fun: F) -> Self
         where F: Fn(Flag<&str>) -> Option<P>,
               P: Into<Policy<T>> {
 
-        TokenFnConfig {
+        FnConfig {
             fun,
             phantom: PhantomData,
         }
@@ -171,7 +171,7 @@ impl<F, P, T> TokenFnConfig<F, P, T> {
     }
 }
 
-impl<F, P, T> Deref for TokenFnConfig<F, P, T> {
+impl<F, P, T> Deref for FnConfig<F, P, T> {
     type Target = F;
 
     fn deref(&self) -> &F {
@@ -179,13 +179,13 @@ impl<F, P, T> Deref for TokenFnConfig<F, P, T> {
     }
 }
 
-impl<F, P, T> DerefMut for TokenFnConfig<F, P, T> {
+impl<F, P, T> DerefMut for FnConfig<F, P, T> {
     fn deref_mut(&mut self) -> &mut F {
         &mut self.fun
     }
 }
 
-impl<F, P, T> Config for TokenFnConfig<F, P, T>
+impl<F, P, T> Config for FnConfig<F, P, T>
     where F: Fn(Flag<&str>) -> Option<P>,
           P: Into<Policy<T>> {
 
@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn hash_config() {
-        let config: HashConfig<String> = HashConfig::new()
+        let config: HashConfig0<String> = HashConfig0::new()
             .both('a', "all",       false)
             .long(     "log",       IfAttached)
             .both('m', "message",   true)
@@ -339,7 +339,7 @@ mod tests {
             (Short('q'), Never),      (Long("quiet"),    Never),
         ];
 
-        let specific_config: HashConfig<&str> = HashConfig::new()
+        let specific_config: HashConfig0<&str> = HashConfig0::new()
             .both('a', "all",       false)
             .long(     "log",       IfAttached)
             .both('m', "message",   true)
@@ -373,7 +373,7 @@ mod tests {
             Some(presence)
         }
 
-        let config = FnConfig::new(get);
+        let config = FnConfig0::new(get);
 
         check_config(config);
         assert_eq!( config(Short('m')), Some(Always) );
@@ -381,7 +381,7 @@ mod tests {
 
     #[test]
     fn allow_everything() {
-        let config = FnConfig::new(|_| Some(IfAttached));
+        let config = FnConfig0::new(|_| Some(IfAttached));
         assert_eq!( get_short(&config, 'q'), Some(IfAttached) );
         assert_eq!( get_long(&config, "tralala"), Some(IfAttached) );
     }
