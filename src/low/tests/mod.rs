@@ -23,7 +23,7 @@ fn _long_short_ref() -> HashConfig<&'static str> {
 
 #[test]
 fn owned() {
-    let config = TokenHashConfig::new()
+    let config = HashConfig::new()
         .opt('a', false)
         .opt("all".to_owned(), false)
         .opt('o', true)
@@ -82,7 +82,7 @@ fn borrowed_long() {
 // Testing helper
 
 fn assert_parse(input: &[&str], output: &[Item<()>]) {
-    let config = TokenHashConfig::new()
+    let config = HashConfig::new()
         .opt('a', false)
         .opt("all", false)
         .opt('o', true)
