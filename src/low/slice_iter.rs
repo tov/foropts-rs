@@ -36,7 +36,9 @@ impl<'a, Cfg, Arg> SliceIter<'a, Cfg, Arg>
         &mut self.config
     }
 
-    pub fn next_with_config<Cfg1: Config>(&mut self, config: Cfg1) -> Option<Item<'a>> {
+    pub fn next_with_config<Cfg1: Config>(&mut self, config: Cfg1)
+        -> Option<Item<'a, Cfg1::Token>> {
+
         self.state.next_with_config(config)
     }
 
@@ -49,7 +51,7 @@ impl<'a, Cfg, Arg> SliceIter<'a, Cfg, Arg>
 }
 
 impl<'a, Arg> State<'a, Arg> where Arg: Borrow<str> {
-    pub fn next_with_config<Cfg: Config>(&mut self, config: Cfg) -> Option<Item<'a>> {
+    pub fn next_with_config<Cfg: Config>(&mut self, config: Cfg) -> Option<Item<'a, Cfg::Token>> {
         loop {
             match self.first {
                 InnerState::Start => {
@@ -85,67 +87,77 @@ impl<'a, Arg> State<'a, Arg> where Arg: Borrow<str> {
         }
     }
 
-    fn parse_long<Cfg: Config>(&mut self, config: Cfg, after_hyphens: &'a str) -> Item<'a> {
+    fn parse_long<Cfg: Config>(&mut self, config: Cfg, after_hyphens: &'a str)
+        -> Item<'a, Cfg::Token> {
+
         if let Some(index) = after_hyphens.find('=') {
             let long  = &after_hyphens[.. index];
             let param = &after_hyphens[index + 1 ..];
             let flag  = Flag::Long(long);
-            match config.get_long_param(long) {
-                None             => Item::Error(ErrorKind::UnknownFlag(flag)),
-                Some(Never)      => Item::Error(ErrorKind::UnexpectedParam(flag, param)),
-                Some(IfAttached) => Item::Opt(flag, Some(param)),
-                Some(Always)     => Item::Opt(flag, Some(param)),
+            match config.get_long_policy(long) {
+                None         => Item::Error(ErrorKind::UnknownFlag(flag)),
+                Some(policy) => match policy.presence {
+                    Never      => Item::Error(ErrorKind::UnexpectedParam(flag, param)),
+                    IfAttached => Item::Opt(flag, Some(param), policy.token),
+                    Always     => Item::Opt(flag, Some(param), policy.token),
+                },
             }
         } else {
             let long = after_hyphens;
             let flag = Flag::Long(long);
-            match config.get_long_param(long) {
+            match config.get_long_policy(long) {
                 None             => Item::Error(ErrorKind::UnknownFlag(flag)),
-                Some(Never)      => Item::Opt(flag, None),
-                Some(IfAttached) => Item::Opt(flag, None),
-                Some(Always)     => match self.next_arg() {
-                    None           => Item::Error(ErrorKind::MissingParam(flag)),
-                    Some(param)    => Item::Opt(flag, Some(param)),
+                Some(policy)     => match policy.presence {
+                    Never      => Item::Opt(flag, None, policy.token),
+                    IfAttached => Item::Opt(flag, None, policy.token),
+                    Always     => match self.next_arg() {
+                        None           => Item::Error(ErrorKind::MissingParam(flag)),
+                        Some(param)    => Item::Opt(flag, Some(param), policy.token),
+                    },
                 },
             }
         }
     }
 
-    fn parse_short<Cfg: Config>(&mut self, config: Cfg, c: char, rest: &'a str) -> Item<'a> {
+    fn parse_short<Cfg: Config>(&mut self, config: Cfg, c: char, rest: &'a str)
+        -> Item<'a, Cfg::Token> {
+
         let flag = Flag::Short(c);
 
-        match config.get_short_param(c) {
+        match config.get_short_policy(c) {
             None => {
                 self.first = InnerState::ShortOpts(rest);
                 Item::Error(ErrorKind::UnknownFlag(flag))
             },
-            Some(Always) => if rest.is_empty() {
-                match self.next_arg() {
-                    None      => {
-                        // self.first was set to State::Start by next_arg.
-                        Item::Error(ErrorKind::MissingParam(flag))
-                    },
-                    Some(arg) => {
-                        self.first = InnerState::Start;
-                        Item::Opt(flag, Some(arg))
-                    },
-                }
-            } else {
-                self.first = InnerState::Start;
-                Item::Opt(flag, Some(rest))
-            },
-            Some(IfAttached) => {
-                self.first = InnerState::Start;
-                if rest.is_empty() {
-                    Item::Opt(flag, None)
+            Some(policy) => match policy.presence {
+                Always => if rest.is_empty() {
+                    match self.next_arg() {
+                        None      => {
+                            // self.first was set to State::Start by next_arg.
+                            Item::Error(ErrorKind::MissingParam(flag))
+                        },
+                        Some(arg) => {
+                            self.first = InnerState::Start;
+                            Item::Opt(flag, Some(arg), policy.token)
+                        },
+                    }
                 } else {
-                    Item::Opt(flag, Some(rest))
+                    self.first = InnerState::Start;
+                    Item::Opt(flag, Some(rest), policy.token)
+                },
+                IfAttached => {
+                    self.first = InnerState::Start;
+                    if rest.is_empty() {
+                        Item::Opt(flag, None, policy.token)
+                    } else {
+                        Item::Opt(flag, Some(rest), policy.token)
+                    }
+                },
+                Never => {
+                    self.first = InnerState::ShortOpts(rest);
+                    Item::Opt(flag, None, policy.token)
                 }
             },
-            Some(Never) => {
-                self.first = InnerState::ShortOpts(rest);
-                Item::Opt(flag, None)
-            }
         }
     }
 
@@ -164,9 +176,9 @@ impl<'a, Cfg, Arg> Iterator for SliceIter<'a, Cfg, Arg>
     where Cfg: Config,
           Arg: Borrow<str> {
 
-    type Item = Item<'a>;
+    type Item = Item<'a, Cfg::Token>;
 
-    fn next(&mut self) -> Option<Item<'a>> {
+    fn next(&mut self) -> Option<Item<'a, Cfg::Token>> {
         self.state.next_with_config(&self.config)
     }
 }

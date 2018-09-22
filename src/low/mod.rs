@@ -6,14 +6,16 @@ mod errors;
 mod flag;
 mod item;
 mod iter_iter;
+mod policy;
 mod slice_iter;
 
 #[cfg(test)]
 mod tests;
 
-pub use self::config::{Presence, Config, HashConfig, FnConfig};
+pub use self::config::{Config, HashConfig, FnConfig};
 pub use self::errors::ErrorKind;
 pub use self::flag::Flag;
 pub use self::item::Item;
 pub use self::iter_iter::ArgItem;
+pub use self::policy::{Presence, OptPolicy};
 pub use self::slice_iter::SliceIter;

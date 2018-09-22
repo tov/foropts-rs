@@ -1,5 +1,6 @@
 use super::slice_iter::SliceIter;
 use super::flag::Flag;
+use super::policy::{OptPolicy, Presence};
 
 use std::borrow::Borrow;
 use std::collections::HashMap;
@@ -8,112 +9,12 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Whether a particular option expects/recognizes parameters.
-///
-/// When queried about a flag, a [`Config`] returns a `Presence` to determine
-/// how to parse it—in particular, whether to expect a parameter to follow.
-///
-/// Functions that accept `Presence`s usually accept any type that implements
-/// `Into<Presence>`. This includes `bool`, where `true` maps to [`Always`]
-/// and `false` maps to [`Never`].
-///
-/// [`Config`]: trait.Config.html
-/// [`Always`]: #variant.Always
-/// [`Never`]: #variant.Never
-pub enum Presence {
-    /// Option will expect a parameter.
-    ///
-    /// If a parameter is not found,
-    /// [`ErrorKind::MissingParam`](enum.ErrorKind.html#variant.MissingParam)
-    /// is returned. This can only happen at the end of the arguments.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use foropts::low::*;
-    /// let config = FnConfig::new(|_| Some(Presence::Always));
-    ///
-    /// let result: Vec<_> = config.slice_iter(&[
-    ///     "-a", "foo", "-bbar", "--cee", "baz", "--dee=qux", "-e"
-    /// ]).collect();
-    ///
-    /// assert_eq!( result,
-    ///             &[Item::Opt(Flag::Short('a'), Some("foo")),
-    ///               Item::Opt(Flag::Short('b'), Some("bar")),
-    ///               Item::Opt(Flag::Long("cee"), Some("baz")),
-    ///               Item::Opt(Flag::Long("dee"), Some("qux")),
-    ///               Item::Error(ErrorKind::MissingParam(Flag::Short('e')))] );
-    /// ```
-    Always,
-    /// Option will recognize a parameter if attached.
-    ///
-    /// For short options, this means that anything in the token following
-    /// the flag will be considered the parameter; for long options, an
-    /// equals sign (`=`) must be provided to recognize a parameter.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use foropts::low::*;
-    /// let config = FnConfig::new(|_| Some(Presence::IfAttached));
-    ///
-    /// let result: Vec<_> = config.slice_iter(&[
-    ///     "-a", "foo", "-bbar", "--cee", "baz", "--dee=qux", "-e"
-    /// ]).collect();
-    ///
-    /// assert_eq!( result,
-    ///             &[Item::Opt(Flag::Short('a'), None),
-    ///               Item::Positional("foo"),
-    ///               Item::Opt(Flag::Short('b'), Some("bar")),
-    ///               Item::Opt(Flag::Long("cee"), None),
-    ///               Item::Positional("baz"),
-    ///               Item::Opt(Flag::Long("dee"), Some("qux")),
-    ///               Item::Opt(Flag::Short('e'), None) ]);
-    /// ```
-    IfAttached,
-    /// Option will not expect a parameter.
-    ///
-    /// It is an error to provide a long option with an equals sign (`=`), in
-    /// which case
-    /// [`ErrorKind::UnexpectedParam`](enum.ErrorKind.html#variant.UnexpectedParam)
-    /// will be returned.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use foropts::low::*;
-    /// let config = FnConfig::new(|_| Some(Presence::Never));
-    ///
-    /// let result: Vec<_> = config.slice_iter(&[
-    ///     "-a", "foo", "-bbar", "--cee", "baz", "--dee=qux", "-e"
-    /// ]).collect();
-    ///
-    /// assert_eq!( result,
-    ///             &[Item::Opt(Flag::Short('a'), None),
-    ///               Item::Positional("foo"),
-    ///               Item::Opt(Flag::Short('b'), None),
-    ///               Item::Opt(Flag::Short('b'), None),
-    ///               Item::Opt(Flag::Short('a'), None),
-    ///               Item::Opt(Flag::Short('r'), None),
-    ///               Item::Opt(Flag::Long("cee"), None),
-    ///               Item::Positional("baz"),
-    ///               Item::Error(ErrorKind::UnexpectedParam(Flag::Long("dee"), "qux")),
-    ///               Item::Opt(Flag::Short('e'), None) ]);
-    /// ```
-    Never,
-}
-
-impl From<bool> for Presence {
-    fn from(b: bool) -> Self {
-        if b { Presence::Always } else { Presence::Never }
-    }
-}
-
 pub trait Config {
-    fn get_short_param(&self, short: char) -> Option<Presence>;
+    type Token;
 
-    fn get_long_param(&self, long: &str) -> Option<Presence>;
+    fn get_short_policy(&self, short: char) -> Option<OptPolicy<Self::Token>>;
+
+    fn get_long_policy(&self, long: &str) -> Option<OptPolicy<Self::Token>>;
 
     fn slice_iter<'a, Arg>(&self, args: &'a [Arg]) -> SliceIter<'a, &Self, Arg>
         where Arg: Borrow<str> {
@@ -130,34 +31,39 @@ pub trait Config {
 }
 
 impl<'a, T: Config + ?Sized> Config for &'a T {
-    fn get_short_param(&self, short: char) -> Option<Presence> {
-        T::get_short_param(self, short)
+    type Token = T::Token;
+
+    fn get_short_policy(&self, short: char) -> Option<OptPolicy<T::Token>> {
+        T::get_short_policy(self, short)
     }
 
-    fn get_long_param(&self, long: &str) -> Option<Presence> {
-        T::get_long_param(self, long)
+    fn get_long_policy(&self, long: &str) -> Option<OptPolicy<T::Token>> {
+        T::get_long_policy(self, long)
     }
 }
 
 impl<T: Config + ?Sized> Config for Box<T> {
-    fn get_short_param(&self, short: char) -> Option<Presence> {
-        T::get_short_param(&self, short)
+    type Token = T::Token;
+
+    fn get_short_policy(&self, short: char) -> Option<OptPolicy<T::Token>> {
+        T::get_short_policy(&self, short)
     }
 
-    fn get_long_param(&self, long: &str) -> Option<Presence> {
-        T::get_long_param(&self, long)
+    fn get_long_policy(&self, long: &str) -> Option<OptPolicy<T::Token>> {
+        T::get_long_policy(&self, long)
     }
 }
 
 /// The configuration for the argument parser.
 #[derive(Clone)]
-pub struct HashConfig<L> {
-    short_opts: HashMap<char, Presence>,
-    long_opts:  HashMap<L, Presence>,
+pub struct HashConfig<L, P = ()> {
+    short_opts: HashMap<char, OptPolicy<T>>,
+    long_opts:  HashMap<L, OptPolicy<T>>,
 }
 
-impl<L> fmt::Debug for HashConfig<L>
-    where L: Eq + Hash + Borrow<str> {
+impl<L, T> fmt::Debug for HashConfig<L, T>
+    where L: Eq + Hash + Borrow<str>,
+          T: fmt::Debug {
     
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut map = f.debug_map();
@@ -174,17 +80,24 @@ impl<L> fmt::Debug for HashConfig<L>
     }
 }
 
-impl<L> Config for HashConfig<L> where L: Eq + Hash + Borrow<str> {
-    fn get_short_param(&self, short: char) -> Option<Presence> {
+impl<L, T> Config for HashConfig<L, T>
+    where L: Eq + Hash + Borrow<str>,
+          T: Clone {
+
+    type Token = T;
+
+    fn get_short_policy(&self, short: char) -> Option<OptPolicy<T>> {
         self.short_opts.get(&short).cloned()
     }
 
-    fn get_long_param(&self, long: &str) -> Option<Presence> {
+    fn get_long_policy(&self, long: &str) -> Option<OptPolicy<T>> {
         self.long_opts.get(long).cloned()
     }
 }
 
-impl<L> HashConfig<L> where L: Eq + Hash + Borrow<str> {
+impl<L, T> HashConfig<L, T>
+    where L: Eq + Hash + Borrow<str> {
+
     pub fn new() -> Self {
         HashConfig {
             short_opts: HashMap::new(),
@@ -201,7 +114,7 @@ impl<L> HashConfig<L> where L: Eq + Hash + Borrow<str> {
 
     pub fn opt<F, P>(self, flag: F, param: P) -> Self
         where F: Into<Flag<L>>,
-              P: Into<Presence> {
+              P: Into<OptPolicy<T>> {
 
         match flag.into() {
             Flag::Short(short) => self.short(short, param),
@@ -210,7 +123,7 @@ impl<L> HashConfig<L> where L: Eq + Hash + Borrow<str> {
     }
 
     pub fn short<P>(mut self, flag: char, param: P) -> Self
-        where P: Into<Presence> {
+        where P: Into<OptPolicy<T>> {
 
         self.short_opts.insert(flag, param.into());
         self
@@ -218,7 +131,7 @@ impl<L> HashConfig<L> where L: Eq + Hash + Borrow<str> {
 
     pub fn long<S, P>(mut self, flag: S, param: P) -> Self
         where S: Into<L>,
-              P: Into<Presence> {
+              P: Into<OptPolicy<T>> {
 
         self.long_opts.insert(flag.into(), param.into());
         self
@@ -226,10 +139,11 @@ impl<L> HashConfig<L> where L: Eq + Hash + Borrow<str> {
 
     pub fn both<S, P>(self, short: char, long: S, param: P) -> Self
         where S: Into<L>,
-              P: Into<Presence> {
+              P: Into<OptPolicy<T>>,
+              T: Clone {
 
-        let presence = param.into();
-        self.short(short, presence).long(long, presence)
+        let policy = param.into();
+        self.short(short, policy.clone()).long(long, policy.clone())
     }
 }
 
@@ -272,64 +186,99 @@ impl<F, P> DerefMut for FnConfig<F, P> {
 impl<F, P> Config for FnConfig<F, P>
     where F: Fn(Flag<&str>) -> Option<P>,
           P: Into<Presence> {
+
+    type Token = ();
     
-    fn get_short_param(&self, short: char) -> Option<Presence> {
-        (self.fun)(Flag::Short(short)).map(Into::into)
+    fn get_short_policy(&self, short: char) -> Option<OptPolicy<()>> {
+        (self.fun)(Flag::Short(short)).map(Into::<OptPolicy<()>>::into)
     }
 
-    fn get_long_param(&self, long: &str) -> Option<Presence> {
-        (self.fun)(Flag::Long(long)).map(Into::into)
+    fn get_long_policy(&self, long: &str) -> Option<OptPolicy<()>> {
+        (self.fun)(Flag::Long(long)).map(Into::<OptPolicy<()>>::into)
     }
 }
 
-impl<T: Config, U: Config> Config for (T, U) {
-    fn get_short_param(&self, short: char) -> Option<Presence> {
-        self.0.get_short_param(short).or_else(||
-            self.1.get_short_param(short))
+impl<T, U> Config for (T, U)
+    where T: Config,
+          U: Config<Token = T::Token> {
+
+    type Token = T::Token;
+
+    fn get_short_policy(&self, short: char) -> Option<OptPolicy<Self::Token>> {
+        self.0.get_short_policy(short).or_else(||
+            self.1.get_short_policy(short))
     }
 
-    fn get_long_param(&self, long: &str) -> Option<Presence> {
-        self.0.get_long_param(long).or_else(||
-            self.1.get_long_param(long))
+    fn get_long_policy(&self, long: &str) -> Option<OptPolicy<Self::Token>> {
+        self.0.get_long_policy(long).or_else(||
+            self.1.get_long_policy(long))
     }
 }
 
 impl<L, P> Config for [(Flag<L>, P)]
     where L: Borrow<str>,
-          P: Copy + Into<Presence> {
+          P: Clone + Into<Presence> {
 
-    fn get_short_param(&self, name: char) -> Option<Presence> {
-        self.into_iter().find(|pair| pair.0.is(name)).map(|pair| pair.1.into())
+    type Token = ();
+
+    fn get_short_policy(&self, name: char) -> Option<OptPolicy<()>> {
+        self.into_iter().find(|pair| pair.0.is(name))
+            .map(|pair| Into::<OptPolicy<()>>::into(pair.1.clone()))
     }
 
-    fn get_long_param(&self, name: &str) -> Option<Presence> {
-        self.into_iter().find(|pair| pair.0.is(name)).map(|pair| pair.1.into())
+    fn get_long_policy(&self, name: &str) -> Option<OptPolicy<()>> {
+        self.into_iter().find(|pair| pair.0.is(name))
+            .map(|pair| Into::<OptPolicy<()>>::into(pair.1.clone()))
+    }
+}
+
+impl<L, P, T> Config for [(Flag<L>, P, T)]
+    where L: Borrow<str>,
+          P: Clone + Into<Presence>,
+          T: Clone {
+
+    type Token = T;
+
+    fn get_short_policy(&self, name: char) -> Option<OptPolicy<T>> {
+        self.into_iter().find(|pair| pair.0.is(name))
+            .map(|&(_, ref presence, ref token)|
+                OptPolicy::new(presence.clone(), token.clone()))
+    }
+
+    fn get_long_policy(&self, name: &str) -> Option<OptPolicy<T>> {
+        self.into_iter().find(|pair| pair.0.is(name))
+            .map(|&(_, ref presence, ref token)|
+                OptPolicy::new(presence.clone(), token.clone()))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::flag::Flag::*;
-    use super::super::config::Presence::*;
+    use super::super::Flag::*;
+    use super::super::Presence::*;
+
+    fn pres<T>(res: Option<OptPolicy<T>>) -> Option<Presence> {
+        res.map(|policy| policy.presence)
+    }
 
     fn check_config<C: Config>(config: C) {
-        assert_eq!( config.get_short_param('a'),        Some(Never) );
-        assert_eq!( config.get_short_param('b'),        None );
-        assert_eq!( config.get_short_param('m'),        Some(Always) );
-        assert_eq!( config.get_short_param('r'),        Some(IfAttached) );
-        assert_eq!( config.get_short_param('s'),        Some(Always) );
-        assert_eq!( config.get_short_param('v'),        Some(Never) );
-        assert_eq!( config.get_short_param('q'),        Some(Never) );
+        assert_eq!(pres(config.get_short_policy('a')), Some(Never) );
+        assert_eq!(pres(config.get_short_policy('b')), None );
+        assert_eq!(pres(config.get_short_policy('m')), Some(Always) );
+        assert_eq!(pres(config.get_short_policy('r')), Some(IfAttached) );
+        assert_eq!(pres(config.get_short_policy('s')), Some(Always) );
+        assert_eq!(pres(config.get_short_policy('v')), Some(Never) );
+        assert_eq!(pres(config.get_short_policy('q')), Some(Never) );
 
-        assert_eq!( config.get_long_param("all"),       Some(Never) );
-        assert_eq!( config.get_long_param("bare"),      None );
-        assert_eq!( config.get_long_param("log"),       Some(IfAttached) );
-        assert_eq!( config.get_long_param("message"),   Some(Always) );
-        assert_eq!( config.get_long_param("rebase"),    Some(IfAttached) );
-        assert_eq!( config.get_long_param("strategy"),  Some(Always) );
-        assert_eq!( config.get_long_param("verbose"),   Some(Never) );
-        assert_eq!( config.get_long_param("quiet"),     Some(Never) );
+        assert_eq!(pres(config.get_long_policy("all")), Some(Never) );
+        assert_eq!(pres(config.get_long_policy("bare")), None );
+        assert_eq!(pres(config.get_long_policy("log")), Some(IfAttached) );
+        assert_eq!(pres(config.get_long_policy("message")), Some(Always) );
+        assert_eq!(pres(config.get_long_policy("rebase")), Some(IfAttached) );
+        assert_eq!(pres(config.get_long_policy("strategy")), Some(Always) );
+        assert_eq!(pres(config.get_long_policy("verbose")), Some(Never) );
+        assert_eq!(pres(config.get_long_policy("quiet")), Some(Never) );
     }
 
     #[test]
@@ -353,13 +302,13 @@ mod tests {
             (Short('m'), true),     (Long("message"), true),
         ];
 
-        assert_eq!( config.get_short_param('a'),        Some(Never) );
-        assert_eq!( config.get_short_param('b'),        None );
-        assert_eq!( config.get_short_param('m'),        Some(Always) );
+        assert_eq!( pres(config.get_short_policy('a')),        Some(Never) );
+        assert_eq!( pres(config.get_short_policy('b')),        None );
+        assert_eq!( pres(config.get_short_policy('m')),        Some(Always) );
 
-        assert_eq!( config.get_long_param("all"),       Some(Never) );
-        assert_eq!( config.get_long_param("bare"),      None );
-        assert_eq!( config.get_long_param("message"),   Some(Always) );
+        assert_eq!( pres(config.get_long_policy("all")),       Some(Never) );
+        assert_eq!( pres(config.get_long_policy("bare")),      None );
+        assert_eq!( pres(config.get_long_policy("message")),   Some(Always) );
     }
 
     #[test]
@@ -427,7 +376,7 @@ mod tests {
     #[test]
     fn allow_everything() {
         let config = FnConfig::new(|_| Some(IfAttached));
-        assert_eq!( config.get_short_param('q'), Some(IfAttached) );
-        assert_eq!( config.get_long_param("tralala"), Some(IfAttached) );
+        assert_eq!( pres(config.get_short_policy('q')), Some(IfAttached) );
+        assert_eq!( pres(config.get_long_policy("tralala")), Some(IfAttached) );
     }
 }

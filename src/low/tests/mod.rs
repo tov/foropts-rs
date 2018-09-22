@@ -32,8 +32,8 @@ fn owned() {
     let result: Vec<_> = config.into_slice_iter(&["-a", "-ofile"]).collect();
 
     assert_eq!( result,
-                &[ Item::Opt(Flag::Short('a'), None),
-                    Item::Opt(Flag::Short('o'), Some("file")) ] );
+                &[ Item::Opt(Flag::Short('a'), None, ()),
+                   Item::Opt(Flag::Short('o'), Some("file"), ()) ] );
 }
 
 #[test]
@@ -81,7 +81,7 @@ fn borrowed_long() {
 
 // Testing helper
 
-fn assert_parse(input: &[&str], output: &[Item]) {
+fn assert_parse(input: &[&str], output: &[Item<()>]) {
     let config = HashConfig::new()
         .opt('a', false)
         .opt("all", false)

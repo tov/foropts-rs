@@ -71,7 +71,7 @@ struct PullCmd<'a> {
 }
 
 fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
-    let config0 = HashConfig::new()
+    let config0 = HashConfig::<_>::new()
         .opt("version", false)
         .opt("help", false);
 
@@ -83,7 +83,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
 
     while let Some(item) = parser.next() {
         match item {
-            Item::Opt(flag, None) => {
+            Item::Opt(flag, None, _) => {
                 if flag.is("version") {
                     global.version = true;
                 } else if flag.is("help") {
@@ -112,7 +112,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
 
                         for item in parser {
                             match item {
-                                Item::Opt(flag, param) => {
+                                Item::Opt(flag, param, _) => {
                                     if flag.is('v') || flag.is("verbose") {
                                         command.verbose = true;
                                     } else if flag.is('q') || flag.is("quiet") {
@@ -160,7 +160,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
 
                         while let Some(item) = init_parser.next() {
                             match item {
-                                Item::Opt(flag, _) => {
+                                Item::Opt(flag, _, _) => {
                                     if flag.is("bare") {
                                         result.bare = true;
                                     } else {
@@ -201,7 +201,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
 
                         while let Some(item) = parser.next() {
                             match item {
-                                Item::Opt(flag, _) => {
+                                Item::Opt(flag, _, _) => {
                                     if flag.is('n') || flag.is("dry-run") {
                                         command.dry_run = true;
                                     } else if flag.is('v') || flag.is("verbose") {
@@ -238,7 +238,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
 
                         while let Some(item) = parser.next() {
                             match item {
-                                Item::Opt(flag, param) => {
+                                Item::Opt(flag, param, _) => {
                                     if flag.is('m') || flag.is("message") {
                                         command.message = param;
                                     } else if flag.is('a') || flag.is("all") {
@@ -280,7 +280,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
 
                         while let Some(item) = parser.next() {
                             match item {
-                                Item::Opt(flag, param) => {
+                                Item::Opt(flag, param, _) => {
                                     if flag.is('v') || flag.is("verbose") {
                                         command.verbose = true;
                                     } else if flag.is('q') || flag.is("quiet") {
@@ -336,7 +336,7 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
 
                         while let Some(item) = parser.next() {
                             match item {
-                                Item::Opt(flag, param) => {
+                                Item::Opt(flag, param, _) => {
                                     if flag.is('t') || flag.is("tags") {
                                         command.tags = true;
                                     } else if flag.is('r') || flag.is("rebase") {
