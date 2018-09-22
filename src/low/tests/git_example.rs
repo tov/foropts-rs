@@ -71,7 +71,7 @@ struct PullCmd<'a> {
 }
 
 fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
-    let config0 = HashConfig::<_>::new()
+    let config0 = HashConfig::new()
         .opt("version", false)
         .opt("help", false);
 
@@ -258,13 +258,18 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
                     }
 
                     "push" => {
-                        *parser.config_mut() = HashConfig::new()
-                            .opt('v', false).opt("verbose", false)
-                            .opt('q', false).opt("quiet", false)
-                            .opt('f', false).opt("force", false)
-                            .opt('d', false).opt("delete", false)
-                            .opt("all", false)
-                            .opt("repo", true);
+                        #[derive(Clone)]
+                        enum PushFlag {
+                            Verbose, Quiet, Force, Delete, All, Repo
+                        }
+
+                        let config: TokenHashConfig<&str, _> = TokenHashConfig::new()
+                            .both('v', "verbose", (false, PushFlag::Verbose))
+                            .both('q', "quiet",   (false, PushFlag::Quiet))
+                            .both('f', "force",   (false, PushFlag::Force))
+                            .both('d', "delete",  (false, PushFlag::Delete))
+                            .long(     "all",     (false, PushFlag::All))
+                            .long(     "repo",    (true,  PushFlag::Repo));
 
                         let mut command = PushCmd {
                             global,
@@ -278,29 +283,22 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
 
                         let mut positional_repo = false;
 
-                        while let Some(item) = parser.next() {
+                        while let Some(item) = parser.next_with_config(&config) {
                             match item {
-                                Item::Opt(flag, param, _) => {
-                                    if flag.is('v') || flag.is("verbose") {
-                                        command.verbose = true;
-                                    } else if flag.is('q') || flag.is("quiet") {
-                                        command.verbose = false;
-                                    } else if flag.is('f') || flag.is("force") {
-                                        command.force = false;
-                                    } else if flag.is('d') || flag.is("delete") {
-                                        command.delete = false;
-                                    } else if flag.is('a') || flag.is("all") {
-                                        command.all = true;
-                                    } else if flag.is("repo") {
+                                Item::Opt(_, param, token) => match token {
+                                    PushFlag::Verbose   => command.verbose = true,
+                                    PushFlag::Quiet     => command.verbose = false,
+                                    PushFlag::Force     => command.force = true,
+                                    PushFlag::Delete    => command.delete = true,
+                                    PushFlag::All       => command.all = true,
+                                    PushFlag::Repo      => {
                                         if positional_repo {
                                             Err("repo already given")?
                                         } else {
                                             command.repo = param;
                                         }
-                                    } else {
-                                        unreachable!("5");
                                     }
-                                }
+                                },
 
                                 Item::Positional(file) => {
                                     if positional_repo {

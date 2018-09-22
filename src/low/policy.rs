@@ -101,31 +101,41 @@ impl From<bool> for Presence {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OptPolicy<T> {
+pub struct Policy<T> {
     pub presence: Presence,
     pub token:    T,
 }
 
-impl<T> OptPolicy<T> {
+impl<T> Policy<T> {
     pub fn new<P>(presence: P, token: T) -> Self
         where P: Into<Presence> {
 
-        OptPolicy {
+        Policy {
             presence: presence.into(),
             token,
         }
     }
 }
 
-impl<P, T> From<P> for OptPolicy<T>
+impl<P, T> From<P> for Policy<T>
     where P: Into<Presence>,
           T: Default {
 
     fn from(presence: P) -> Self {
-        OptPolicy {
+        Policy {
             presence: presence.into(),
             token:    T::default(),
         }
     }
 }
 
+impl<P, T> From<(P, T)> for Policy<T>
+    where P: Into<Presence> {
+
+    fn from((presence, token): (P, T)) -> Self {
+        Policy {
+            presence: presence.into(),
+            token,
+        }
+    }
+}

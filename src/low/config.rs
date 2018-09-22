@@ -1,6 +1,6 @@
 use super::slice_iter::SliceIter;
 use super::flag::Flag;
-use super::policy::{OptPolicy, Presence};
+use super::policy::{Policy, Presence};
 
 use std::borrow::Borrow;
 use std::collections::HashMap;
@@ -12,9 +12,9 @@ use std::ops::{Deref, DerefMut};
 pub trait Config {
     type Token;
 
-    fn get_short_policy(&self, short: char) -> Option<OptPolicy<Self::Token>>;
+    fn get_short_policy(&self, short: char) -> Option<Policy<Self::Token>>;
 
-    fn get_long_policy(&self, long: &str) -> Option<OptPolicy<Self::Token>>;
+    fn get_long_policy(&self, long: &str) -> Option<Policy<Self::Token>>;
 
     fn slice_iter<'a, Arg>(&self, args: &'a [Arg]) -> SliceIter<'a, &Self, Arg>
         where Arg: Borrow<str> {
@@ -30,38 +30,40 @@ pub trait Config {
     }
 }
 
-impl<'a, T: Config + ?Sized> Config for &'a T {
-    type Token = T::Token;
+impl<'a, C: Config + ?Sized> Config for &'a C {
+    type Token = C::Token;
 
-    fn get_short_policy(&self, short: char) -> Option<OptPolicy<T::Token>> {
-        T::get_short_policy(self, short)
+    fn get_short_policy(&self, short: char) -> Option<Policy<C::Token>> {
+        C::get_short_policy(self, short)
     }
 
-    fn get_long_policy(&self, long: &str) -> Option<OptPolicy<T::Token>> {
-        T::get_long_policy(self, long)
+    fn get_long_policy(&self, long: &str) -> Option<Policy<C::Token>> {
+        C::get_long_policy(self, long)
+    }
+}
+
+impl<C: Config + ?Sized> Config for Box<C> {
+    type Token = C::Token;
+
+    fn get_short_policy(&self, short: char) -> Option<Policy<C::Token>> {
+        C::get_short_policy(&self, short)
+    }
+
+    fn get_long_policy(&self, long: &str) -> Option<Policy<C::Token>> {
+        C::get_long_policy(&self, long)
     }
 }
 
-impl<T: Config + ?Sized> Config for Box<T> {
-    type Token = T::Token;
-
-    fn get_short_policy(&self, short: char) -> Option<OptPolicy<T::Token>> {
-        T::get_short_policy(&self, short)
-    }
-
-    fn get_long_policy(&self, long: &str) -> Option<OptPolicy<T::Token>> {
-        T::get_long_policy(&self, long)
-    }
-}
+pub type HashConfig<L> = TokenHashConfig<L, ()>;
 
 /// The configuration for the argument parser.
 #[derive(Clone)]
-pub struct HashConfig<L, P = ()> {
-    short_opts: HashMap<char, OptPolicy<T>>,
-    long_opts:  HashMap<L, OptPolicy<T>>,
+pub struct TokenHashConfig<L, T> {
+    short_opts: HashMap<char, Policy<T>>,
+    long_opts:  HashMap<L, Policy<T>>,
 }
 
-impl<L, T> fmt::Debug for HashConfig<L, T>
+impl<L, T> fmt::Debug for TokenHashConfig<L, T>
     where L: Eq + Hash + Borrow<str>,
           T: fmt::Debug {
     
@@ -80,33 +82,33 @@ impl<L, T> fmt::Debug for HashConfig<L, T>
     }
 }
 
-impl<L, T> Config for HashConfig<L, T>
+impl<L, T> Config for TokenHashConfig<L, T>
     where L: Eq + Hash + Borrow<str>,
           T: Clone {
 
     type Token = T;
 
-    fn get_short_policy(&self, short: char) -> Option<OptPolicy<T>> {
+    fn get_short_policy(&self, short: char) -> Option<Policy<T>> {
         self.short_opts.get(&short).cloned()
     }
 
-    fn get_long_policy(&self, long: &str) -> Option<OptPolicy<T>> {
+    fn get_long_policy(&self, long: &str) -> Option<Policy<T>> {
         self.long_opts.get(long).cloned()
     }
 }
 
-impl<L, T> HashConfig<L, T>
+impl<L, T> TokenHashConfig<L, T>
     where L: Eq + Hash + Borrow<str> {
 
     pub fn new() -> Self {
-        HashConfig {
+        TokenHashConfig {
             short_opts: HashMap::new(),
             long_opts:  HashMap::new(),
         }
     }
 
     pub fn with_capacities(shorts: usize, longs: usize) -> Self {
-        HashConfig {
+        TokenHashConfig {
             short_opts: HashMap::with_capacity(shorts),
             long_opts:  HashMap::with_capacity(longs),
         }
@@ -114,7 +116,7 @@ impl<L, T> HashConfig<L, T>
 
     pub fn opt<F, P>(self, flag: F, param: P) -> Self
         where F: Into<Flag<L>>,
-              P: Into<OptPolicy<T>> {
+              P: Into<Policy<T>> {
 
         match flag.into() {
             Flag::Short(short) => self.short(short, param),
@@ -123,7 +125,7 @@ impl<L, T> HashConfig<L, T>
     }
 
     pub fn short<P>(mut self, flag: char, param: P) -> Self
-        where P: Into<OptPolicy<T>> {
+        where P: Into<Policy<T>> {
 
         self.short_opts.insert(flag, param.into());
         self
@@ -131,7 +133,7 @@ impl<L, T> HashConfig<L, T>
 
     pub fn long<S, P>(mut self, flag: S, param: P) -> Self
         where S: Into<L>,
-              P: Into<OptPolicy<T>> {
+              P: Into<Policy<T>> {
 
         self.long_opts.insert(flag.into(), param.into());
         self
@@ -139,11 +141,9 @@ impl<L, T> HashConfig<L, T>
 
     pub fn both<S, P>(self, short: char, long: S, param: P) -> Self
         where S: Into<L>,
-              P: Into<OptPolicy<T>>,
-              T: Clone {
+              P: Clone + Into<Policy<T>> {
 
-        let policy = param.into();
-        self.short(short, policy.clone()).long(long, policy.clone())
+        self.short(short, param.clone().into()).long(long, param.into())
     }
 }
 
@@ -189,27 +189,27 @@ impl<F, P> Config for FnConfig<F, P>
 
     type Token = ();
     
-    fn get_short_policy(&self, short: char) -> Option<OptPolicy<()>> {
-        (self.fun)(Flag::Short(short)).map(Into::<OptPolicy<()>>::into)
+    fn get_short_policy(&self, short: char) -> Option<Policy<()>> {
+        (self.fun)(Flag::Short(short)).map(Into::<Policy<()>>::into)
     }
 
-    fn get_long_policy(&self, long: &str) -> Option<OptPolicy<()>> {
-        (self.fun)(Flag::Long(long)).map(Into::<OptPolicy<()>>::into)
+    fn get_long_policy(&self, long: &str) -> Option<Policy<()>> {
+        (self.fun)(Flag::Long(long)).map(Into::<Policy<()>>::into)
     }
 }
 
-impl<T, U> Config for (T, U)
-    where T: Config,
-          U: Config<Token = T::Token> {
+impl<C1, C2> Config for (C1, C2)
+    where C1: Config,
+          C2: Config<Token = C1::Token> {
 
-    type Token = T::Token;
+    type Token = C1::Token;
 
-    fn get_short_policy(&self, short: char) -> Option<OptPolicy<Self::Token>> {
+    fn get_short_policy(&self, short: char) -> Option<Policy<Self::Token>> {
         self.0.get_short_policy(short).or_else(||
             self.1.get_short_policy(short))
     }
 
-    fn get_long_policy(&self, long: &str) -> Option<OptPolicy<Self::Token>> {
+    fn get_long_policy(&self, long: &str) -> Option<Policy<Self::Token>> {
         self.0.get_long_policy(long).or_else(||
             self.1.get_long_policy(long))
     }
@@ -221,14 +221,14 @@ impl<L, P> Config for [(Flag<L>, P)]
 
     type Token = ();
 
-    fn get_short_policy(&self, name: char) -> Option<OptPolicy<()>> {
+    fn get_short_policy(&self, name: char) -> Option<Policy<()>> {
         self.into_iter().find(|pair| pair.0.is(name))
-            .map(|pair| Into::<OptPolicy<()>>::into(pair.1.clone()))
+            .map(|pair| Policy::new(pair.1.clone(), ()))
     }
 
-    fn get_long_policy(&self, name: &str) -> Option<OptPolicy<()>> {
+    fn get_long_policy(&self, name: &str) -> Option<Policy<()>> {
         self.into_iter().find(|pair| pair.0.is(name))
-            .map(|pair| Into::<OptPolicy<()>>::into(pair.1.clone()))
+            .map(|pair| Policy::new(pair.1.clone(), ()))
     }
 }
 
@@ -239,16 +239,16 @@ impl<L, P, T> Config for [(Flag<L>, P, T)]
 
     type Token = T;
 
-    fn get_short_policy(&self, name: char) -> Option<OptPolicy<T>> {
+    fn get_short_policy(&self, name: char) -> Option<Policy<T>> {
         self.into_iter().find(|pair| pair.0.is(name))
             .map(|&(_, ref presence, ref token)|
-                OptPolicy::new(presence.clone(), token.clone()))
+                Policy::new(presence.clone(), token.clone()))
     }
 
-    fn get_long_policy(&self, name: &str) -> Option<OptPolicy<T>> {
+    fn get_long_policy(&self, name: &str) -> Option<Policy<T>> {
         self.into_iter().find(|pair| pair.0.is(name))
             .map(|&(_, ref presence, ref token)|
-                OptPolicy::new(presence.clone(), token.clone()))
+                Policy::new(presence.clone(), token.clone()))
     }
 }
 
@@ -258,7 +258,7 @@ mod tests {
     use super::super::Flag::*;
     use super::super::Presence::*;
 
-    fn pres<T>(res: Option<OptPolicy<T>>) -> Option<Presence> {
+    fn pres<T>(res: Option<Policy<T>>) -> Option<Presence> {
         res.map(|policy| policy.presence)
     }
 

@@ -178,7 +178,7 @@ impl<'a, Cfg, Arg> Iterator for SliceIter<'a, Cfg, Arg>
 
     type Item = Item<'a, Cfg::Token>;
 
-    fn next(&mut self) -> Option<Item<'a, Cfg::Token>> {
+    fn next(&mut self) -> Option<Self::Item> {
         self.state.next_with_config(&self.config)
     }
 }
