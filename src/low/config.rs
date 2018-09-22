@@ -3,6 +3,7 @@ use super::flag::Flag;
 
 use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::fmt;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
@@ -149,17 +150,31 @@ impl<T: Config + ?Sized> Config for Box<T> {
 }
 
 /// The configuration for the argument parser.
-#[derive(Clone, Debug)]
-pub struct HashConfig<L>
-    where L: Eq + Hash + Borrow<str> {
-
+#[derive(Clone)]
+pub struct HashConfig<L> {
     short_opts: HashMap<char, Presence>,
     long_opts:  HashMap<L, Presence>,
 }
 
-impl<L> Config for HashConfig<L>
+impl<L> fmt::Debug for HashConfig<L>
     where L: Eq + Hash + Borrow<str> {
+    
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut map = f.debug_map();
 
+        for (key, value) in &self.short_opts {
+            map.entry(&Flag::Short::<()>(*key), value);
+        }
+
+        for (key, value) in &self.long_opts {
+            map.entry(&Flag::Long(key.borrow()), value);
+        }
+
+        map.finish()
+    }
+}
+
+impl<L> Config for HashConfig<L> where L: Eq + Hash + Borrow<str> {
     fn get_short_param(&self, short: char) -> Option<Presence> {
         self.short_opts.get(&short).cloned()
     }
@@ -169,9 +184,7 @@ impl<L> Config for HashConfig<L>
     }
 }
 
-impl<L> HashConfig<L>
-    where L: Eq + Hash + Borrow<str> {
-
+impl<L> HashConfig<L> where L: Eq + Hash + Borrow<str> {
     pub fn new() -> Self {
         HashConfig {
             short_opts: HashMap::new(),
