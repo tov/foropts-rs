@@ -1,10 +1,19 @@
 use super::super::util::split_first_str;
-use super::common::InnerState;
-use super::{Config, ErrorKind, Flag, Item, Presence};
-use self::Presence::*;
 
 use std::borrow::Borrow;
 use std::fmt;
+
+mod errors;
+mod item;
+
+#[cfg(test)]
+mod tests;
+
+pub use self::errors::ErrorKind;
+pub use self::item::Item;
+pub use super::{Flag, Presence, Config, HashConfig, FnConfig};
+
+use self::Presence::*;
 
 #[derive(Clone)]
 pub struct SliceIter<'a, Cfg, Arg: 'a> {
@@ -16,6 +25,13 @@ pub struct SliceIter<'a, Cfg, Arg: 'a> {
 struct State<'a, Arg: 'a> {
     first:      InnerState<'a>,
     rest:       &'a [Arg],
+}
+
+#[derive(Clone)]
+enum InnerState<'a> {
+    Start,
+    ShortOpts(&'a str),
+    PositionalOnly,
 }
 
 impl<'a, Cfg, Arg> SliceIter<'a, Cfg, Arg>
@@ -200,12 +216,22 @@ impl<'a, Arg> fmt::Debug for State<'a, Arg>
 
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut list = f.debug_list();
-
         self.first.fmt_to_debug_list(&mut list);
-
         list.entries(self.rest.into_iter().map(Borrow::borrow));
-
         list.finish()
     }
 }
 
+impl<'a> InnerState<'a> {
+    fn fmt_to_debug_list(&self, list: &mut fmt::DebugList) {
+        match *self {
+            InnerState::Start => (),
+            InnerState::ShortOpts(shorts) => {
+                list.entry(&format!("-{}", shorts));
+            }
+            InnerState::PositionalOnly => {
+                list.entry(&"--");
+            }
+        }
+    }
+}

@@ -21,7 +21,7 @@ pub enum Presence {
     /// # Examples
     ///
     /// ```
-    /// # use foropts::low::*;
+    /// # use foropts::low::slice_iter::*;
     /// let config = FnConfig::new(|_| Some(Presence::Always));
     ///
     /// let result: Vec<_> = config.slice_iter(&[
@@ -45,7 +45,7 @@ pub enum Presence {
     /// # Examples
     ///
     /// ```
-    /// # use foropts::low::*;
+    /// # use foropts::low::slice_iter::*;
     /// let config = FnConfig::new(|_| Some(Presence::IfAttached));
     ///
     /// let result: Vec<_> = config.slice_iter(&[
@@ -72,7 +72,7 @@ pub enum Presence {
     /// # Examples
     ///
     /// ```
-    /// # use foropts::low::*;
+    /// # use foropts::low::slice_iter::*;
     /// let config = FnConfig::new(|_| Some(Presence::Never));
     ///
     /// let result: Vec<_> = config.slice_iter(&[
