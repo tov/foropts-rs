@@ -1,24 +1,61 @@
 use super::super::Flag;
-use super::ErrorKind;
+use super::Error;
 
 use std::borrow::Borrow;
 use std::fmt;
 use std::ops::Range;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Item<S> where S: Borrow<str> {
-    Opt(Opt<S>),
+#[derive(Clone)]
+pub enum Item<S, T> {
+    Opt(Opt<S>, T),
     Positional(Positional<S>),
-    Error(ErrorKind<S>),
+    Error(Error<S>),
 }
 
+impl<S, T> fmt::Debug for Item<S, T>
+    where S: Borrow<str>,
+          T: fmt::Debug {
+    
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Item::Opt(ref opt, ref token) =>
+                f.debug_tuple("Opt").field(opt).field(token).finish(),
+            Item::Positional(ref positional) =>
+                f.debug_tuple("Positional").field(positional).finish(),
+            Item::Error(ref error) =>
+                f.debug_tuple("Error").field(error).finish(),
+        }
+    }
+}
+
+impl<S1, S2, T1, T2> PartialEq<Item<S2, T2>> for Item<S1, T1>
+    where S1: Borrow<str>,
+          S2: Borrow<str>,
+          T1: PartialEq<T2> {
+
+    fn eq(&self, other: &Item<S2, T2>) -> bool {
+        use self::Item::*;
+        match (self, other) {
+            (&Opt(ref o1, ref t1), &Opt(ref o2, ref t2)) =>
+                o1 == o2 && t1 == t2,
+            (&Positional(ref p1), &Positional(ref p2)) =>
+                p1 == p2,
+            (&Error(ref e1), &Error(ref e2)) =>
+                e1 == e2,
+            _ => false,
+        }
+    }
+}
+
+impl<S, T> Eq for Item<S, T> where S: Borrow<str>, T: Eq { }
+
 #[derive(Clone)]
-pub struct Opt<S> where S: Borrow<str> {
+pub struct Opt<S> {
     inner: InnerOpt<S>,
 }
 
 #[derive(Clone)]
-enum InnerOpt<S> where S: Borrow<str> {
+enum InnerOpt<S> {
     FlagOpt(FlagOpt<S>),
     ParamOpt(ParamOpt<S>),
 }
@@ -30,7 +67,7 @@ impl<S> Opt<S> where S: Borrow<str> {
             Some(param) => InnerOpt::ParamOpt(ParamOpt::new(flag, param)),
         };
 
-        Opt { inner }
+        Opt { inner, }
     }
 
     pub fn flag(&self) -> Flag<&str> {
@@ -69,7 +106,7 @@ impl<S> fmt::Debug for Opt<S> where S: Borrow<str> {
 }
 
 #[derive(Clone)]
-struct FlagOpt<S> where S: Borrow<str> {
+struct FlagOpt<S> {
     flag:  Flag<S>,
     range: Range<usize>,
 }
@@ -89,7 +126,7 @@ impl<S: Borrow<str>> FlagOpt<S> {
 }
 
 #[derive(Clone)]
-struct ParamOpt<S> where S: Borrow<str> {
+struct ParamOpt<S> {
     flag:           Flag<Range<usize>>,
     param_original: S,
     param_range:    Range<usize>,
