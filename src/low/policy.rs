@@ -100,7 +100,7 @@ impl From<bool> for Presence {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Policy<T> {
     pub presence: Presence,
     pub token:    T,
@@ -117,14 +117,13 @@ impl<T> Policy<T> {
     }
 }
 
-impl<P, T> From<P> for Policy<T>
-    where P: Into<Presence>,
-          T: Default {
+impl<P> From<P> for Policy<()>
+    where P: Into<Presence> {
 
     fn from(presence: P) -> Self {
         Policy {
             presence: presence.into(),
-            token:    T::default(),
+            token:    (),
         }
     }
 }

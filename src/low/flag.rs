@@ -20,6 +20,29 @@ impl<L> Flag<L> {
     pub fn is_long(&self) -> bool {
         !self.is_short()
     }
+
+    pub fn map<F, R>(self, fun: F) -> Flag<R>
+        where F: FnOnce(L) -> R {
+
+        match self {
+            Short(c) => Short(c),
+            Long(s)  => Long(fun(s)),
+        }
+    }
+
+    pub fn as_ref(&self) -> Flag<&L> {
+        match *self {
+            Short(c)    => Short(c),
+            Long(ref s) => Long(s),
+        }
+    }
+
+    pub fn into_option(self) -> Option<L> {
+        match self {
+            Short(_) => None,
+            Long(s)  => Some(s),
+        }
+    }
 }
 
 impl<L: Borrow<str>> Flag<L> {
