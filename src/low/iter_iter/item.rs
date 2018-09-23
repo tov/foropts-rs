@@ -8,7 +8,7 @@ use std::ops::Range;
 #[derive(Clone)]
 pub enum Item<S, T> {
     Opt(Opt<S>, T),
-    Positional(Positional<S>),
+    Positional(S),
     Error(Error<S>),
 }
 
@@ -21,7 +21,7 @@ impl<S, T> fmt::Debug for Item<S, T>
             Item::Opt(ref opt, ref token) =>
                 f.debug_tuple("Opt").field(opt).field(token).finish(),
             Item::Positional(ref positional) =>
-                f.debug_tuple("Positional").field(positional).finish(),
+                f.debug_tuple("Positional").field(&positional.borrow()).finish(),
             Item::Error(ref error) =>
                 f.debug_tuple("Error").field(error).finish(),
         }
@@ -39,7 +39,7 @@ impl<S1, S2, T1, T2> PartialEq<Item<S2, T2>> for Item<S1, T1>
             (&Opt(ref o1, ref t1), &Opt(ref o2, ref t2)) =>
                 o1 == o2 && t1 == t2,
             (&Positional(ref p1), &Positional(ref p2)) =>
-                p1 == p2,
+                p1.borrow() == p2.borrow(),
             (&Error(ref e1), &Error(ref e2)) =>
                 e1 == e2,
             _ => false,
@@ -81,6 +81,53 @@ impl<S> Opt<S> where S: Borrow<str> {
         match self.inner {
             InnerOpt::FlagOpt(_)          => None,
             InnerOpt::ParamOpt(ref inner) => Some(inner.param()),
+        }
+    }
+
+    #[cfg(test)]
+    pub (super) fn short_flag(c: char) -> Self {
+        Opt {
+            inner: InnerOpt::FlagOpt(FlagOpt{
+                flag: Flag::Short(c),
+                range: 0 .. 0
+            })
+        }
+    }
+
+    #[cfg(test)]
+    pub (super) fn long_flag(original: S, range: Range<usize>) -> Self {
+        Opt {
+            inner: InnerOpt::FlagOpt(FlagOpt {
+                flag: Flag::Long(original),
+                range,
+            })
+        }
+    }
+
+    #[cfg(test)]
+    pub (super) fn short_param(c: char, param_original: S, param_range: Range<usize>) -> Self {
+        Opt {
+            inner: InnerOpt::ParamOpt(ParamOpt {
+                flag: Flag::Short(c),
+                param_original,
+                param_range,
+                extra_original: None,
+            })
+        }
+    }
+
+    #[cfg(test)]
+    pub (super) fn long_param(flag_original: Option<S>, flag_range: Range<usize>,
+                              param_original: S, param_range: Range<usize>)
+        -> Self {
+
+        Opt {
+            inner: InnerOpt::ParamOpt(ParamOpt {
+                flag: Flag::Long(flag_range),
+                param_original,
+                param_range,
+                extra_original: flag_original,
+            })
         }
     }
 }
@@ -171,39 +218,42 @@ impl<S: Borrow<str>> ParamOpt<S> {
     }
 }
 
-#[derive(Clone)]
-pub struct Positional<S> {
-    original:       S,
-    range:          Range<usize>,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl<S: Borrow<str>> Positional<S> {
-    pub fn new(value: S) -> Self {
-        let len = value.borrow().len();
-        Positional {
-            original:   value,
-            range:      0 .. len,
-        }
+    #[test]
+    fn short_flag() {
+        let opt1: Opt<&str> = Opt::new(Flag::Short('a'), None);
+        let opt2: Opt<&str> = Opt::short_flag('a');
+        assert_eq!( opt1, opt2 );
     }
 
-    pub fn value(&self) -> &str {
-        &self.original.borrow()[self.range.clone()]
+    #[test]
+    fn long_flag() {
+        let opt1: Opt<&str> = Opt::new(Flag::Long("all"), None);
+        let opt2: Opt<&str> = Opt::long_flag("--all", 2..5);
+        assert_eq!( opt1, opt2 );
+    }
+
+    #[test]
+    fn short_param() {
+        let opt1: Opt<&str> = Opt::new(Flag::Short('m'), Some("hello"));
+        let opt2: Opt<&str> = Opt::short_param('m', "-mhello", 2..7);
+        assert_eq!( opt1, opt2 );
+    }
+
+    #[test]
+    fn long_param_separate() {
+        let opt1: Opt<&str> = Opt::new(Flag::Long("message"), Some("hello"));
+        let opt2: Opt<&str> = Opt::long_param(Some("--message"), 2..9, "hello", 0..5);
+        assert_eq!( opt1, opt2 );
+    }
+
+    #[test]
+    fn long_param_shared() {
+        let opt1: Opt<&str> = Opt::new(Flag::Long("message"), Some("hello"));
+        let opt2: Opt<&str> = Opt::long_param(None, 2..9, "--message=hello", 10..15);
+        assert_eq!( opt1, opt2 );
     }
 }
-
-impl<S: Borrow<str>, T: Borrow<str>> PartialEq<Positional<T>> for Positional<S> {
-    fn eq(&self, other: &Positional<T>) -> bool {
-        self.value() == other.value()
-    }
-}
-
-impl<S: Borrow<str>> Eq for Positional<S> {}
-
-impl<S: Borrow<str>> fmt::Debug for Positional<S> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Positional")
-            .field("value", &self.value())
-            .finish()
-    }
-}
-
