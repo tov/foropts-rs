@@ -5,7 +5,7 @@ mod helpers;
 
 use self::helpers::*;
 
-fn _long_short_owned() -> HashConfig0<String> {
+fn _long_short_owned() -> HashConfig<String> {
     HashConfig::new()
         .short('a', false)
         .long("all", false)
@@ -13,7 +13,7 @@ fn _long_short_owned() -> HashConfig0<String> {
         .long("out", true)
 }
 
-fn _long_short_ref() -> HashConfig0<&'static str> {
+fn _long_short_ref() -> HashConfig<&'static str> {
     HashConfig::new()
         .short('a', false)
         .long("all", false)
@@ -23,7 +23,7 @@ fn _long_short_ref() -> HashConfig0<&'static str> {
 
 #[test]
 fn owned() {
-    let config = HashConfig0::new()
+    let config = HashConfig::new()
         .opt('a', false)
         .opt("all".to_owned(), false)
         .opt('o', true)
@@ -82,7 +82,7 @@ fn borrowed_long() {
 // Testing helper
 
 fn assert_parse(input: &[&str], output: &[Item<()>]) {
-    let config = HashConfig0::new()
+    let config = HashConfig::new()
         .opt('a', false)
         .opt("all", false)
         .opt('o', true)

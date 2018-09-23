@@ -13,7 +13,7 @@ mod slice_iter;
 #[cfg(test)]
 mod tests;
 
-pub use self::config::{Config, HashConfig0, HashConfig, FnConfig0, FnConfig};
+pub use self::config::{Config, HashConfig, FnConfig};
 pub use self::errors::ErrorKind;
 pub use self::flag::Flag;
 pub use self::item::Item;

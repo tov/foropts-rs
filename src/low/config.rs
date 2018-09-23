@@ -54,11 +54,9 @@ impl<C: Config + ?Sized> Config for Box<C> {
     }
 }
 
-pub type HashConfig0<L> = HashConfig<L, ()>;
-
 /// The configuration for the argument parser.
 #[derive(Clone)]
-pub struct HashConfig<L, T> {
+pub struct HashConfig<L, T = ()> {
     short_opts: HashMap<char, Policy<T>>,
     long_opts:  HashMap<L, Policy<T>>,
 }
@@ -146,8 +144,6 @@ impl<L, T> HashConfig<L, T>
         self.short(short, param.clone().into()).long(long, param.into())
     }
 }
-
-pub type FnConfig0<F, P> = FnConfig<F, P, ()>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct FnConfig<F, P, T> {
@@ -289,7 +285,7 @@ mod tests {
 
     #[test]
     fn hash_config() {
-        let config: HashConfig0<String> = HashConfig0::new()
+        let config: HashConfig<String> = HashConfig::new()
             .both('a', "all",       false)
             .long(     "log",       IfAttached)
             .both('m', "message",   true)
@@ -339,7 +335,7 @@ mod tests {
             (Short('q'), Never),      (Long("quiet"),    Never),
         ];
 
-        let specific_config: HashConfig0<&str> = HashConfig0::new()
+        let specific_config: HashConfig<&str> = HashConfig::new()
             .both('a', "all",       false)
             .long(     "log",       IfAttached)
             .both('m', "message",   true)
@@ -373,7 +369,7 @@ mod tests {
             Some(presence)
         }
 
-        let config = FnConfig0::new(get);
+        let config = FnConfig::new(get);
 
         check_config(config);
         assert_eq!( config(Short('m')), Some(Always) );
@@ -381,7 +377,7 @@ mod tests {
 
     #[test]
     fn allow_everything() {
-        let config = FnConfig0::new(|_| Some(IfAttached));
+        let config = FnConfig::new(|_| Some(IfAttached));
         assert_eq!( get_short(&config, 'q'), Some(IfAttached) );
         assert_eq!( get_long(&config, "tralala"), Some(IfAttached) );
     }
