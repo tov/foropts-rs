@@ -85,7 +85,7 @@ impl<S> Opt<S> where S: Borrow<str> {
     }
 
     #[cfg(test)]
-    pub (super) fn short_flag(c: char) -> Self {
+    pub (super) fn new_short_flag(c: char) -> Self {
         Opt {
             inner: InnerOpt::FlagOpt(FlagOpt{
                 flag: Flag::Short(c),
@@ -95,7 +95,7 @@ impl<S> Opt<S> where S: Borrow<str> {
     }
 
     #[cfg(test)]
-    pub (super) fn long_flag(original: S, range: Range<usize>) -> Self {
+    pub (super) fn new_long_flag(original: S, range: Range<usize>) -> Self {
         Opt {
             inner: InnerOpt::FlagOpt(FlagOpt {
                 flag: Flag::Long(original),
@@ -105,7 +105,9 @@ impl<S> Opt<S> where S: Borrow<str> {
     }
 
     #[cfg(test)]
-    pub (super) fn short_param(c: char, param_original: S, param_range: Range<usize>) -> Self {
+    pub (super) fn new_short_param(c: char, param_original: S, param_range: Range<usize>)
+        -> Self {
+
         Opt {
             inner: InnerOpt::ParamOpt(ParamOpt {
                 flag: Flag::Short(c),
@@ -117,9 +119,9 @@ impl<S> Opt<S> where S: Borrow<str> {
     }
 
     #[cfg(test)]
-    pub (super) fn long_param(flag_original: Option<S>, flag_range: Range<usize>,
-                              param_original: S, param_range: Range<usize>)
-        -> Self {
+    pub (super) fn new_long_param(flag_original: Option<S>, flag_range: Range<usize>,
+                                  param_original: S, param_range: Range<usize>)
+                                  -> Self {
 
         Opt {
             inner: InnerOpt::ParamOpt(ParamOpt {
@@ -225,35 +227,35 @@ mod tests {
     #[test]
     fn short_flag() {
         let opt1: Opt<&str> = Opt::new(Flag::Short('a'), None);
-        let opt2: Opt<&str> = Opt::short_flag('a');
+        let opt2: Opt<&str> = Opt::new_short_flag('a');
         assert_eq!( opt1, opt2 );
     }
 
     #[test]
     fn long_flag() {
         let opt1: Opt<&str> = Opt::new(Flag::Long("all"), None);
-        let opt2: Opt<&str> = Opt::long_flag("--all", 2..5);
+        let opt2: Opt<&str> = Opt::new_long_flag("--all", 2..5);
         assert_eq!( opt1, opt2 );
     }
 
     #[test]
     fn short_param() {
         let opt1: Opt<&str> = Opt::new(Flag::Short('m'), Some("hello"));
-        let opt2: Opt<&str> = Opt::short_param('m', "-mhello", 2..7);
+        let opt2: Opt<&str> = Opt::new_short_param('m', "-mhello", 2..7);
         assert_eq!( opt1, opt2 );
     }
 
     #[test]
     fn long_param_separate() {
         let opt1: Opt<&str> = Opt::new(Flag::Long("message"), Some("hello"));
-        let opt2: Opt<&str> = Opt::long_param(Some("--message"), 2..9, "hello", 0..5);
+        let opt2: Opt<&str> = Opt::new_long_param(Some("--message"), 2..9, "hello", 0..5);
         assert_eq!( opt1, opt2 );
     }
 
     #[test]
     fn long_param_shared() {
         let opt1: Opt<&str> = Opt::new(Flag::Long("message"), Some("hello"));
-        let opt2: Opt<&str> = Opt::long_param(None, 2..9, "--message=hello", 10..15);
+        let opt2: Opt<&str> = Opt::new_long_param(None, 2..9, "--message=hello", 10..15);
         assert_eq!( opt1, opt2 );
     }
 }
