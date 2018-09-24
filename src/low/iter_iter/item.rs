@@ -1,5 +1,5 @@
 use super::super::Flag;
-use super::Error;
+use super::{Error, ErrorKind};
 
 use std::borrow::Borrow;
 use std::fmt;
@@ -10,6 +10,12 @@ pub enum Item<S, T> {
     Opt(Opt<S>, T),
     Positional(S),
     Error(Error<S>),
+}
+
+impl<S, T> Item<S, T> {
+    pub (super) fn error(kind: ErrorKind, option: Opt<S>) -> Self {
+        Item::Error(Error { kind, option, })
+    }
 }
 
 impl<S, T> fmt::Debug for Item<S, T>
@@ -84,7 +90,6 @@ impl<S> Opt<S> where S: Borrow<str> {
         }
     }
 
-    #[cfg(test)]
     pub (super) fn new_short_flag(c: char) -> Self {
         Opt {
             inner: InnerOpt::FlagOpt(FlagOpt{
@@ -94,7 +99,6 @@ impl<S> Opt<S> where S: Borrow<str> {
         }
     }
 
-    #[cfg(test)]
     pub (super) fn new_long_flag(original: S, range: Range<usize>) -> Self {
         Opt {
             inner: InnerOpt::FlagOpt(FlagOpt {
@@ -104,7 +108,6 @@ impl<S> Opt<S> where S: Borrow<str> {
         }
     }
 
-    #[cfg(test)]
     pub (super) fn new_short_param(c: char, param_original: S, param_range: Range<usize>)
         -> Self {
 
@@ -118,10 +121,9 @@ impl<S> Opt<S> where S: Borrow<str> {
         }
     }
 
-    #[cfg(test)]
     pub (super) fn new_long_param(flag_original: Option<S>, flag_range: Range<usize>,
                                   param_original: S, param_range: Range<usize>)
-                                  -> Self {
+        -> Self {
 
         Opt {
             inner: InnerOpt::ParamOpt(ParamOpt {

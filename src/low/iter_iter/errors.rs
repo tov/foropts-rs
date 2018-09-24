@@ -4,8 +4,8 @@ use std::fmt;
 
 #[derive(Clone)]
 pub struct Error<S> {
-    kind:   ErrorKind,
-    option: Opt<S>,
+    pub (super) kind:   ErrorKind,
+    pub (super) option: Opt<S>,
 }
 
 impl<S> fmt::Debug for Error<S> where S: Borrow<str> {
