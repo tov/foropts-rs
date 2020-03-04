@@ -318,9 +318,8 @@ fn git<'a>(args: &'a [&'a str]) -> Result<GitCmd<'a>, String> {
 
                     "pull" => {
                         *parser.config_mut() = HashConfig::new()
-                            .opt('t', false).opt("tags", false)
-                            .opt('r', Presence::IfAttached)
-                            .opt("rebase", Presence::IfAttached);
+                            .both('t', "tags", false)
+                            .both('r', "rebase", Presence::IfAttached);
 
                         let mut command = PullCmd {
                             global,

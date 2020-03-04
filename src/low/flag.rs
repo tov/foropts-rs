@@ -75,11 +75,11 @@ impl From<String> for Flag<String> {
     }
 }
 
-impl<'b, L: fmt::Display> fmt::Display for Flag<L> {
+impl<L: Borrow<str>> fmt::Display for Flag<L> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Short(short)   => write!(f, "-{}", short),
-            Long(ref long) => write!(f, "--{}", long),
+            Long(ref long) => write!(f, "--{}", long.borrow()),
         }
     }
 }

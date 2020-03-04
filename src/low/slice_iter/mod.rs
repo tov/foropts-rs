@@ -23,14 +23,14 @@ pub struct SliceIter<'a, Cfg, Arg: 'a> {
 
 #[derive(Clone)]
 struct State<'a, Arg: 'a> {
-    first:      InnerState<'a>,
+    first:      InnerState<&'a str>,
     rest:       &'a [Arg],
 }
 
 #[derive(Clone)]
-enum InnerState<'a> {
+enum InnerState<S> {
     Start,
-    ShortOpts(&'a str),
+    ShortOpts(S),
     PositionalOnly,
 }
 
@@ -222,12 +222,12 @@ impl<'a, Arg> fmt::Debug for State<'a, Arg>
     }
 }
 
-impl<'a> InnerState<'a> {
+impl<S: Borrow<str>> InnerState<S> {
     fn fmt_to_debug_list(&self, list: &mut fmt::DebugList) {
         match *self {
             InnerState::Start => (),
-            InnerState::ShortOpts(shorts) => {
-                list.entry(&format!("-{}", shorts));
+            InnerState::ShortOpts(ref shorts) => {
+                list.entry(&format!("-{}", shorts.borrow()));
             }
             InnerState::PositionalOnly => {
                 list.entry(&"--");
